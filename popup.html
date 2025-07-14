@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ff4458;
+      font-weight: bold;
+    }
+    
+    .section {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+    }
+    
+    .control-group {
+      margin-bottom: 10px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      margin: 3px 0;
+    }
+    
+    .start-btn {
+      background: #ff4458;
+      color: white;
+    }
+    
+    .start-btn:hover {
+      background: #e03e52;
+    }
+    
+    .stop-btn {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .stats {
+      background: #e7f3ff;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+    
+    .status {
+      padding: 8px;
+      text-align: center;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .status.running {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status.stopped {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .api-status {
+      font-size: 11px;
+      text-align: center;
+      padding: 4px;
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+    
+    .api-ok {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .url-status {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-top: 3px;
+    }
+    
+    .url-saved {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .url-error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    🤖 Smart Tinder Swiper
+  </div>
+
+  <div id="status" class="status stopped">
+    Status: Stopped
+  </div>
+
+  <!-- Configuration Section -->
+  <div class="section">
+    <div class="control-group">
+      <label for="apiEndpoint">API Endpoint:</label>
+      <input type="url" id="apiEndpoint" placeholder="http://localhost:3000/decide">
+    </div>
+
+    <div class="control-group">
+      <label for="maxSwipes">Max Swipes:</label>
+      <select id="maxSwipes">
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="200" selected>200</option>
+        <option value="300">300</option>
+        <option value="500">500</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Control Buttons -->
+  <button id="startBtn" class="start-btn">🚀 Start Swiping</button>
+  <button id="stopBtn" class="stop-btn" style="display: none;">⏹️ Stop Swiping</button>
+
+  <!-- Statistics -->
+  <div class="stats">
+    <div style="font-weight: bold; margin-bottom: 8px;">📊 Session Stats</div>
+    
+    <div class="stats-row">
+      <span>Total:</span>
+      <span id="statsTotal">0</span>
+    </div>
+    
+    <div class="stats-row">
+      <span>Likes:</span>
+      <span id="statsLikes">0</span>
+    </div>
+    
+    <div class="stats-row">
+      <span>Passes:</span>
+      <span id="statsPasses">0</span>
+    </div>
+    
+    <div class="stats-row">
+      <span>Errors:</span>
+      <span id="statsErrors">0</span>
+    </div>
+    
+    <div class="stats-row">
+      <span>Like Rate:</span>
+      <span id="likeRate">0%</span>
+    </div>
+  </div>
+
+  <!-- Quick Setup Links -->
+  <div style="margin-top: 15px; font-size: 11px; text-align: center; color: #666;">
+    <div>Default: http://localhost:3000/decide</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

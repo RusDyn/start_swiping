@@ -99,26 +99,46 @@ class PopupController {
     };
 
     try {
-      // Отправляем команду на content script
-      await chrome.tabs.sendMessage(this.currentTab.id, {
+      // Проверяем что content script загружен
+      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
+        action: 'updateConfig',
+        config: config
+      });
+      
+      if (!response || !response.success) {
+        throw new Error('Content script not ready. Please refresh the page.');
+      }
+      
+      // Отправляем команду старта
+      const startResponse = await chrome.tabs.sendMessage(this.currentTab.id, {
         action: 'start',
         config: config
       });
       
-      this.isRunning = true;
-      this.updateUI();
-      
-      console.log('Swiper started with config:', config);
+      if (startResponse && startResponse.success) {
+        this.isRunning = true;
+        this.updateUI();
+        console.log('Swiper started with config:', config);
+      } else {
+        throw new Error(startResponse?.error || 'Failed to start swiper');
+      }
       
     } catch (error) {
       console.error('Failed to start swiper:', error);
-      alert('Failed to start. Make sure you are on Tinder.com and refresh the page.');
+      
+      if (error.message.includes('Receiving end does not exist')) {
+        alert('Content script not loaded. Please refresh the Tinder page and try again.');
+      } else if (error.message.includes('not ready')) {
+        alert('Please refresh the Tinder page and wait for it to fully load.');
+      } else {
+        alert(`Failed to start: ${error.message}`);
+      }
     }
   }
 
   async stopSwiping() {
     try {
-      await chrome.tabs.sendMessage(this.currentTab.id, {
+      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
         action: 'stop'
       });
       
@@ -129,6 +149,9 @@ class PopupController {
       
     } catch (error) {
       console.error('Failed to stop swiper:', error);
+      // Даже если есть ошибка, считаем что остановили
+      this.isRunning = false;
+      this.updateUI();
     }
   }
 
@@ -166,8 +189,13 @@ class PopupController {
       }
 
     } catch (error) {
-      // Content script may not be ready or tab closed
-      console.log('Could not get stats - content script not ready or tab closed');
+      // Content script may not be ready or tab closed - не логируем для избежания спама
+      if (this.isRunning) {
+        console.log('Could not get stats - content script may not be ready');
+        // Останавливаем если content script недоступен
+        this.isRunning = false;
+        this.updateUI();
+      }
     }
   }
 

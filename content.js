@@ -383,7 +383,7 @@ class SimpleTinderSwiper {
         }
       });
       
-      else {
+    } else {
       // Single photo - extract from current view
       keenSlides.forEach((slide, i) => {
         const imgDiv = slide.querySelector('.profileCard__slider__img[style*="background-image"]');
@@ -405,13 +405,11 @@ class SimpleTinderSwiper {
       if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
         processedUrls.add(url);
         photos.push(url);
-        console.log(`📸 Aria photo ${i + 1}: ${url.substring(0, 80)}...`);
       }
     });
     
     // Method 3: All background images (fallback)
     if (photos.length < Math.min(totalPhotos, 3)) {
-      console.log('📸 Method 3: All background images (fallback)');
       const allBgImages = document.querySelectorAll('[style*="background-image"]');
       console.log(`Found ${allBgImages.length} background images`);
       
@@ -420,7 +418,6 @@ class SimpleTinderSwiper {
         if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
           processedUrls.add(url);
           photos.push(url);
-          console.log(`📸 Fallback photo ${i + 1}: ${url.substring(0, 80)}...`);
         }
       });
     }
@@ -551,7 +548,6 @@ class SimpleTinderSwiper {
       // Navigate to the photo
       if (i === 0) {
         // First photo should already be visible
-        console.log('📸 Capturing first photo (already visible)');
       } else {
         // Navigate to next photo
         await this.navigateToNextPhoto(photoContainer, i);
@@ -565,9 +561,8 @@ class SimpleTinderSwiper {
       if (activePhoto && this.isValidProfilePhoto(activePhoto) && !processedUrls.has(activePhoto)) {
         processedUrls.add(activePhoto);
         photos.push(activePhoto);
-        
       } else {
-        console.log(`⚠️ Failed to capture photo ${i + 1}`);
+        console.log(`⚠️ Failed to capture photo ${i + 1} - no valid URL found`);
       }
     }
     
@@ -884,7 +879,6 @@ class SimpleTinderSwiper {
     
     // Try multiple selectors for like button
     const likeSelectors = [
-      'button span.Hidden:contains("Like")',
       'button[class*="Bgc($c-ds-background-gamepad-sparks-like-default)"]',
       'button .gamepad-icon-wrapper svg[fill*="gamepad-sparks-like"]',
       '[data-testid="gamepadLikeButton"]',
@@ -930,7 +924,6 @@ class SimpleTinderSwiper {
     
     // Try multiple selectors for pass button
     const passSelectors = [
-      'button span.Hidden:contains("Nope")',
       'button[class*="Bgc($c-ds-background-gamepad-sparks-nope-default)"]',
       'button .gamepad-icon-wrapper svg[fill*="gamepad-sparks-nope"]',
       '[data-testid="gamepadPassButton"]',

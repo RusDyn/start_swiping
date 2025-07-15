@@ -104,7 +104,6 @@ class SimpleTinderSwiper {
         console.log(`\n🔄 SWIPE #${this.swipeCount + 1} STARTING...`);
         
         // STEP 1: Click "Open Profile" button and wait
-        console.log('📍 STEP 1: Looking for "Open Profile" button...');
         const openSuccess = await this.clickOpenProfileAndWait();
         
         if (!openSuccess) {
@@ -114,7 +113,6 @@ class SimpleTinderSwiper {
         }
         
         // STEP 2: Extract all profile data
-        console.log('\n📍 STEP 2: Extracting profile data...');
         const profileData = await this.extractAllProfileData();
         
         if (!profileData) {
@@ -132,7 +130,6 @@ class SimpleTinderSwiper {
         });
         
         // STEP 3: Send to API
-        console.log('\n📍 STEP 3: Sending to API...');
         const decision = await this.requestDecision(profileData);
         
         if (!decision) {
@@ -142,7 +139,6 @@ class SimpleTinderSwiper {
         }
         
         // STEP 4: Execute swipe
-        console.log('\n📍 STEP 4: Executing swipe...');
         await this.executeSwipe(decision);
         
         // Wait before next profile
@@ -214,27 +210,21 @@ class SimpleTinderSwiper {
     try {
       // 1. Extract name
       data.name = this.extractName();
-      console.log(`✅ Name: "${data.name}"`);
       
       // 2. Extract age
       data.age = this.extractAge();
-      console.log(`✅ Age: ${data.age}`);
       
       // 3. Extract verification status
       data.verified = this.extractVerificationStatus();
-      console.log(`✅ Verified: ${data.verified}`);
       
       // 4. Extract photos
       data.photos = await this.extractAllPhotos();
-      console.log(`✅ Photos: ${data.photos.length} found`);
       
       // 5. Extract bio
       data.bio = this.extractBio();
-      console.log(`✅ Bio: ${data.bio.length} characters`);
       
       // 6. Extract all profile info sections
       data.profileInfo = this.extractAllProfileInfo();
-      console.log(`✅ Profile sections: ${Object.keys(data.profileInfo).length} found`);
       
       // Validate data quality
       if (data.name === 'Unknown' || data.photos.length === 0) {
@@ -440,11 +430,9 @@ class SimpleTinderSwiper {
   }
 
   extractBio() {
-    console.log('📄 Extracting bio...');
     
     // Look specifically for "About me" section
     const containers = document.querySelectorAll('div[class*="P(24px)"][class*="W(100%)"]');
-    console.log(`Found ${containers.length} info containers`);
     
     for (const container of containers) {
       // Check if this container has "About me" header
@@ -461,7 +449,6 @@ class SimpleTinderSwiper {
     }
     
     // Fallback: look for any large text content (old method)
-    console.log('📄 Using fallback bio extraction...');
     for (const container of containers) {
       const text = container.textContent.trim();
       if (text.length > 20 && 
@@ -682,7 +669,6 @@ class SimpleTinderSwiper {
     const valueSpan = container.querySelector('span[class*="Typs(display-3-strong)"]');
     if (valueSpan) {
       const value = valueSpan.textContent.trim();
-      console.log(`✅ Looking for: "${value}"`);
       return value;
     }
     return null;
@@ -773,7 +759,6 @@ class SimpleTinderSwiper {
   }
 
   extractGenericSection(container) {
-    console.log('📄 Extracting generic section info...');
     
     // Try different extraction methods
     const info = {};

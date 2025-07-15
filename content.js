@@ -178,7 +178,6 @@ class SimpleTinderSwiper {
       const hiddenSpan = btn.querySelector('span.Hidden');
       if (hiddenSpan && hiddenSpan.textContent.trim() === 'Open Profile') {
         showButton = btn;
-        console.log('✅ Found "Open Profile" button');
         break;
       }
     }
@@ -271,7 +270,6 @@ class SimpleTinderSwiper {
         const nameEl = document.querySelector(selector);
         if (nameEl && nameEl.textContent.trim()) {
           const name = this.cleanName(nameEl.textContent.trim());
-          console.log(`✅ Found name using ${selector}: "${name}"`);
           return name;
         }
       } catch (e) {
@@ -295,7 +293,6 @@ class SimpleTinderSwiper {
         const ageEl = document.querySelector(selector);
         if (ageEl && ageEl.textContent.trim() && /^\d{1,2}$/.test(ageEl.textContent.trim())) {
           const age = parseInt(ageEl.textContent.trim());
-          console.log(`✅ Found age using ${selector}: ${age}`);
           return age;
         }
       } catch (e) {
@@ -322,7 +319,6 @@ class SimpleTinderSwiper {
       try {
         const verifiedEl = document.querySelector(selector);
         if (verifiedEl) {
-          console.log(`✅ Found verification using ${selector}`);
           return true;
         }
       } catch (e) {
@@ -334,7 +330,6 @@ class SimpleTinderSwiper {
     const titleElements = document.querySelectorAll('title');
     for (const title of titleElements) {
       if (title.textContent.trim() === 'Verified!') {
-        console.log('✅ Found verification via title element text content');
         return true;
       }
     }
@@ -344,7 +339,6 @@ class SimpleTinderSwiper {
     for (const svg of svgElements) {
       const titleEl = svg.querySelector('title');
       if (titleEl && titleEl.textContent.trim() === 'Verified!') {
-        console.log('✅ Found verification via SVG title element');
         return true;
       }
     }
@@ -353,7 +347,6 @@ class SimpleTinderSwiper {
     const badgeElements = document.querySelectorAll('[class*="verified"], [class*="badge"], [data-testid*="verified"]');
     for (const badge of badgeElements) {
       if (badge.textContent.includes('Verified') || badge.getAttribute('aria-label')?.includes('Verified')) {
-        console.log('✅ Found verification via badge pattern');
         return true;
       }
     }
@@ -475,13 +468,11 @@ class SimpleTinderSwiper {
       // Check if this container has "About me" header
       const header = container.querySelector('h2[class*="Typs(body-2-strong)"]');
       if (header && header.textContent.trim() === 'About me') {
-        console.log('✅ Found "About me" section');
         
         // Extract the bio text content (excluding the header)
         const bioDiv = container.querySelector('div[class*="C($c-ds-text-primary)"][class*="Typs(body-1-regular)"]');
         if (bioDiv) {
           let bioText = bioDiv.textContent.trim();
-          console.log(`✅ Found bio text: "${bioText.substring(0, 100)}..."`);
           return bioText;
         }
       }
@@ -501,7 +492,6 @@ class SimpleTinderSwiper {
           !text.includes('miles away')) {
         // Remove "About me" prefix if present
         let cleanText = text.replace(/^About me\s*/i, '').trim();
-        console.log(`✅ Found fallback bio: "${cleanText.substring(0, 100)}..."`);
         return cleanText;
       }
     }
@@ -574,8 +564,6 @@ class SimpleTinderSwiper {
     
     // Navigate through each photo and capture immediately
     for (let i = 0; i < totalPhotos; i++) {
-      console.log(`👆 Navigating to photo ${i + 1}/${totalPhotos}...`);
-      
       // Navigate to the photo
       if (i === 0) {
         // First photo should already be visible
@@ -593,13 +581,12 @@ class SimpleTinderSwiper {
       if (activePhoto && this.isValidProfilePhoto(activePhoto) && !processedUrls.has(activePhoto)) {
         processedUrls.add(activePhoto);
         photos.push(activePhoto);
-        console.log(`📸 Captured photo ${i + 1}: ${activePhoto.substring(0, 80)}...`);
+        
       } else {
         console.log(`⚠️ Failed to capture photo ${i + 1}`);
       }
     }
     
-    console.log(`✅ Captured ${photos.length}/${totalPhotos} photos via navigation`);
     return photos;
   }
   
@@ -629,7 +616,6 @@ class SimpleTinderSwiper {
       if (imgDiv) {
         const url = this.extractUrlFromBackground(imgDiv);
         if (url) {
-          console.log('✅ Found active slide photo');
           return url;
         }
       }
@@ -640,7 +626,6 @@ class SimpleTinderSwiper {
     for (const photo of visiblePhotos) {
       const url = this.extractUrlFromBackground(photo);
       if (url) {
-        console.log('✅ Found visible photo element');
         return url;
       }
     }
@@ -650,7 +635,6 @@ class SimpleTinderSwiper {
     for (const photo of ariaPhotos) {
       const url = this.extractUrlFromBackground(photo);
       if (url) {
-        console.log('✅ Found aria-label photo');
         return url;
       }
     }
@@ -933,7 +917,6 @@ class SimpleTinderSwiper {
       const hiddenSpan = btn.querySelector('span.Hidden');
       if (hiddenSpan && hiddenSpan.textContent.trim() === 'Like') {
         likeBtn = btn;
-        console.log('✅ Found like button by hidden text');
         break;
       }
     }
@@ -943,7 +926,6 @@ class SimpleTinderSwiper {
       for (const selector of likeSelectors) {
         likeBtn = document.querySelector(selector);
         if (likeBtn) {
-          console.log(`✅ Found like button with selector: ${selector}`);
           break;
         }
       }
@@ -982,7 +964,6 @@ class SimpleTinderSwiper {
       const hiddenSpan = btn.querySelector('span.Hidden');
       if (hiddenSpan && hiddenSpan.textContent.trim() === 'Nope') {
         passBtn = btn;
-        console.log('✅ Found pass button by hidden text');
         break;
       }
     }
@@ -992,7 +973,6 @@ class SimpleTinderSwiper {
       for (const selector of passSelectors) {
         passBtn = document.querySelector(selector);
         if (passBtn) {
-          console.log(`✅ Found pass button with selector: ${selector}`);
           break;
         }
       }

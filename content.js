@@ -916,13 +916,44 @@ class SimpleTinderSwiper {
   async swipeRight(reason) {
     console.log(`❤️ LIKE: ${reason}`);
     
-    const likeBtn = document.querySelector('[data-testid="gamepadLikeButton"]') ||
-                   document.querySelector('[aria-label="Like"]');
+    // Try multiple selectors for like button
+    const likeSelectors = [
+      'button span.Hidden:contains("Like")',
+      'button[class*="Bgc($c-ds-background-gamepad-sparks-like-default)"]',
+      'button .gamepad-icon-wrapper svg[fill*="gamepad-sparks-like"]',
+      '[data-testid="gamepadLikeButton"]',
+      '[aria-label="Like"]'
+    ];
+    
+    let likeBtn = null;
+    
+    // Find button by hidden text "Like"
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const hiddenSpan = btn.querySelector('span.Hidden');
+      if (hiddenSpan && hiddenSpan.textContent.trim() === 'Like') {
+        likeBtn = btn;
+        console.log('✅ Found like button by hidden text');
+        break;
+      }
+    }
+    
+    // Fallback to other selectors if needed
+    if (!likeBtn) {
+      for (const selector of likeSelectors) {
+        likeBtn = document.querySelector(selector);
+        if (likeBtn) {
+          console.log(`✅ Found like button with selector: ${selector}`);
+          break;
+        }
+      }
+    }
     
     if (likeBtn) {
       likeBtn.click();
+      console.log('✅ Like button clicked');
     } else {
-      // Fallback: keyboard event
+      console.log('⚠️ Like button not found, using keyboard fallback');
       this.triggerKeyEvent('ArrowRight');
     }
     
@@ -933,13 +964,45 @@ class SimpleTinderSwiper {
   async swipeLeft(reason) {
     console.log(`👎 PASS: ${reason}`);
     
-    const passBtn = document.querySelector('[data-testid="gamepadPassButton"]') ||
-                   document.querySelector('[aria-label="Pass"]');
+    // Try multiple selectors for pass button
+    const passSelectors = [
+      'button span.Hidden:contains("Nope")',
+      'button[class*="Bgc($c-ds-background-gamepad-sparks-nope-default)"]',
+      'button .gamepad-icon-wrapper svg[fill*="gamepad-sparks-nope"]',
+      '[data-testid="gamepadPassButton"]',
+      '[aria-label="Pass"]',
+      '[aria-label="Nope"]'
+    ];
+    
+    let passBtn = null;
+    
+    // Find button by hidden text "Nope"
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const hiddenSpan = btn.querySelector('span.Hidden');
+      if (hiddenSpan && hiddenSpan.textContent.trim() === 'Nope') {
+        passBtn = btn;
+        console.log('✅ Found pass button by hidden text');
+        break;
+      }
+    }
+    
+    // Fallback to other selectors if needed
+    if (!passBtn) {
+      for (const selector of passSelectors) {
+        passBtn = document.querySelector(selector);
+        if (passBtn) {
+          console.log(`✅ Found pass button with selector: ${selector}`);
+          break;
+        }
+      }
+    }
     
     if (passBtn) {
       passBtn.click();
+      console.log('✅ Pass button clicked');
     } else {
-      // Fallback: keyboard event
+      console.log('⚠️ Pass button not found, using keyboard fallback');
       this.triggerKeyEvent('ArrowLeft');
     }
   }

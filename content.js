@@ -4,7 +4,7 @@ class SimpleTinderSwiper {
     this.isRunning = false;
     this.swipeCount = 0;
     this.config = {
-      apiEndpoint: 'https://your-api.com/decide', // Ваш API endpoint
+      apiEndpoint: 'https://your-api.com/decide', // Will be updated via popup
       maxSwipes: 200,
       userId: this.generateUserId()
     };
@@ -87,339 +87,330 @@ class SimpleTinderSwiper {
   }
 
   async swipeLoop() {
+    console.log('====== STARTING SWIPE LOOP ======');
+    
     while (this.isRunning && this.swipeCount < this.config.maxSwipes) {
       try {
-        // 1. Извлекаем данные профиля
-        const profileData = this.extractProfileData();
+        console.log(`\n🔄 SWIPE #${this.swipeCount + 1} STARTING...`);
+        
+        // STEP 1: Click "Open Profile" button and wait
+        console.log('📍 STEP 1: Looking for "Open Profile" button...');
+        const openSuccess = await this.clickOpenProfileAndWait();
+        
+        if (!openSuccess) {
+          console.error('❌ Failed to open profile. Stopping.');
+          this.stop();
+          break;
+        }
+        
+        // STEP 2: Extract all profile data
+        console.log('\n📍 STEP 2: Extracting profile data...');
+        const profileData = await this.extractAllProfileData();
         
         if (!profileData) {
-          console.log('⏳ No profile data, waiting... (checking DOM structure)');
-          
-          // Расширенная диагностика
-          console.log('🔍 DOM Analysis:');
-          console.log('- URL:', window.location.href);
-          console.log('- Page title:', document.title);
-          
-          // Ищем все элементы с фотографиями
-          const allPhotos = document.querySelectorAll('[style*="background-image"]');
-          console.log(`- Found ${allPhotos.length} elements with background images`);
-          
-          if (allPhotos.length > 0) {
-            console.log('- First photo element:', allPhotos[0]);
-            console.log('- First photo style:', allPhotos[0].style.backgroundImage);
-          }
-          
-          // Ищем текстовые элементы
-          const h1Elements = document.querySelectorAll('h1');
-          console.log(`- Found ${h1Elements.length} h1 elements`);
-          if (h1Elements.length > 0) {
-            console.log('- H1 texts:', Array.from(h1Elements).map(h => h.textContent.trim()));
-          }
-          
-          // Проверяем общие селекторы
-          const potentialCards = document.querySelectorAll('[class*="card"], [data-testid*="card"], [class*="Card"]');
-          console.log(`- Found ${potentialCards.length} potential card elements`);
-          
-          await this.delay(5000); // Увеличиваем задержку для лучшей диагностики
-          continue;
+          console.error('❌ No profile data extracted. Stopping.');
+          this.stop();
+          break;
         }
-
-        // 2. Отправляем запрос на API для принятия решения
+        
+        console.log('\n✅ PROFILE DATA EXTRACTED:', {
+          name: profileData.name,
+          age: profileData.age,
+          photoCount: profileData.photos.length,
+          bioLength: profileData.bio.length,
+          verified: profileData.verified
+        });
+        
+        // STEP 3: Send to API
+        console.log('\n📍 STEP 3: Sending to API...');
         const decision = await this.requestDecision(profileData);
         
-        // 3. Выполняем свайп на основе решения
+        if (!decision) {
+          console.error('❌ No decision from API. Stopping.');
+          this.stop();
+          break;
+        }
+        
+        // STEP 4: Execute swipe
+        console.log('\n📍 STEP 4: Executing swipe...');
         await this.executeSwipe(decision);
         
-        // 4. Ждем указанную задержку от API
-        await this.delay(decision.nextDelay || 4000);
+        // Wait before next profile
+        const delay = decision.nextDelay || 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await this.delay(delay);
         
         this.swipeCount++;
+        console.log(`✅ Swipe #${this.swipeCount} completed!\n`);
 
       } catch (error) {
-        console.error('Error in swipe loop:', error);
+        console.error('\n❌ CRITICAL ERROR in swipe loop:', error);
+        console.error('Stack trace:', error.stack);
         this.stats.errors++;
-        await this.delay(5000); // Увеличенная пауза при ошибке
-      }
-    }
-    
-    this.stop();
-  }
-
-  extractProfileData() {
-    try {
-      // Обновленные селекторы для новой структуры Tinder
-      const cardSelectors = [
-        '[data-testid="gamepad-card"]',
-        '.Pos\\(r\\).Expand.H\\(--recs-card-height\\)',
-        '.Tcha\\(n\\).Bxsh\\(\\$bxsh-card\\)',
-        '.recsCardboard__cards .Expand',
-        'div[class*="StretchedBox"]'
-      ];
-      
-      let card = null;
-      let usedSelector = '';
-      
-      for (const selector of cardSelectors) {
-        try {
-          card = document.querySelector(selector);
-          if (card) {
-            usedSelector = selector;
-            console.log(`✅ Found profile card using: ${selector}`);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!card) {
-        console.log('❌ No profile card found');
-        return null;
-      }
-
-      // Попытка кликнуть "Show full profile" для получения больше данных
-      this.clickShowFullProfile(card); // Убираем await - делаем неблокирующим
-
-      // Ищем имя по itemprop="name"
-      let name = 'Unknown';
-      let nameEl = card.querySelector('[itemprop="name"]');
-      
-      if (nameEl) {
-        name = nameEl.textContent.trim();
-        console.log(`✅ Found name: "${name}" using itemprop="name"`);
-      } else {
-        // Fallback селекторы для имени
-        const nameSelectors = [
-          '.Typs\\(display-1-strong\\)',
-          'span[class*="display-1"]',
-          'h1',
-          '[class*="display"]'
-        ];
-        
-        for (const selector of nameSelectors) {
-          try {
-            nameEl = card.querySelector(selector);
-            if (nameEl && nameEl.textContent.trim()) {
-              name = this.cleanName(nameEl.textContent.trim());
-              console.log(`✅ Found name: "${name}" using fallback ${selector}`);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-      }
-
-      // Ищем возраст по itemprop="age"
-      let age = null;
-      const ageEl = card.querySelector('[itemprop="age"]');
-      if (ageEl) {
-        age = parseInt(ageEl.textContent.trim());
-        console.log(`✅ Found age: ${age} using itemprop="age"`);
-      } else {
-        // Fallback - ищем в тексте
-        age = this.extractAge(card.textContent);
-        if (age) {
-          console.log(`✅ Found age: ${age} using text extraction`);
-        }
-      }
-
-      // Ищем био
-      let bio = '';
-      const bioSelectors = [
-        '[data-testid="card-bio"]',
-        '[itemprop="description"]',
-        '.BreakWord',
-        'div[class*="BreakWord"]',
-        'div[class*="Whs(pw)"]',
-        'p:not([class*="name"]):not([class*="age"])'
-      ];
-      
-      for (const selector of bioSelectors) {
-        try {
-          const bioEl = card.querySelector(selector);
-          if (bioEl && bioEl.textContent.trim().length > 10) {
-            const text = bioEl.textContent.trim();
-            // Проверяем что это не имя и не возраст
-            if (!text.includes(name) && !text.match(/^\d+$/)) {
-              bio = text;
-              console.log(`✅ Found bio: "${bio.substring(0, 50)}..." using ${selector}`);
-              break;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      // Извлекаем фотографии с новыми селекторами
-      const photos = this.extractPhotoUrls(card);
-      
-      const profileData = {
-        name: name,
-        bio: bio,
-        photos: photos,
-        photoCount: photos.length,
-        age: age,
-        timestamp: Date.now(),
-        url: window.location.href,
-        cardSelector: usedSelector
-      };
-
-      console.log('📊 Profile extracted:', {
-        name: profileData.name,
-        photoCount: profileData.photoCount,
-        bioLength: profileData.bio.length,
-        age: profileData.age,
-        selector: usedSelector
-      });
-
-      // Считаем профиль валидным если есть имя И фото
-      if (profileData.name !== 'Unknown' && profileData.photoCount > 0) {
-        return profileData;
-      }
-
-      console.log('⚠️ Profile data quality insufficient');
-      return null;
-
-    } catch (error) {
-      console.error('Error extracting profile:', error);
-      return null;
-    }
-  }
-
-  extractPhotoUrls(card) {
-    const photos = [];
-    
-    // Ищем по точным селекторам для фото профилей
-    const photoSelectors = [
-      '[aria-label*="Profile Photo"][role="img"]',
-      '.Bdrs\\(8px\\).Bgz\\(cv\\).Bgp\\(c\\).StretchedBox',
-      'div[class*="StretchedBox"][role="img"]',
-      '[role="img"][style*="background-image"]'
-    ];
-    
-    // Начинаем с поиска в карточке
-    let photoElements = [];
-    for (const selector of photoSelectors) {
-      const elements = card.querySelectorAll(selector);
-      if (elements.length > 0) {
-        photoElements = Array.from(elements);
-        console.log(`🔍 Found ${elements.length} photos using selector: ${selector}`);
+        console.log('🛑 Stopping due to error.');
+        this.stop();
         break;
       }
     }
     
-    // Если не нашли в карточке, ищем по всему документу
-    if (photoElements.length === 0) {
-      console.log('🔍 No photos in card, searching entire document...');
-      for (const selector of photoSelectors) {
-        const elements = document.querySelectorAll(selector);
-        if (elements.length > 0) {
-          photoElements = Array.from(elements);
-          console.log(`🔍 Found ${elements.length} photos globally using: ${selector}`);
-          break;
-        }
+    console.log('====== SWIPE LOOP ENDED ======');
+    this.stop();
+  }
+
+  async clickOpenProfileAndWait() {
+    console.log('🔍 Looking for "Open Profile" button...');
+    
+    // Find the "Open Profile" button
+    const buttons = document.querySelectorAll('button');
+    let showButton = null;
+    
+    for (const btn of buttons) {
+      const hiddenSpan = btn.querySelector('span.Hidden');
+      if (hiddenSpan && hiddenSpan.textContent.trim() === 'Open Profile') {
+        showButton = btn;
+        console.log('✅ Found "Open Profile" button');
+        break;
       }
     }
     
-    // Fallback: все элементы с background-image
-    if (photoElements.length === 0) {
-      photoElements = Array.from(document.querySelectorAll('[style*="background-image"]'));
-      console.log(`🔍 Fallback: Found ${photoElements.length} elements with background-image`);
+    if (!showButton) {
+      console.log('⚠️ No "Open Profile" button found - profile might already be open');
+      return true; // Continue anyway
     }
     
-    photoElements.forEach((el, index) => {
-      let url = null;
+    try {
+      console.log('👆 Clicking "Open Profile" button...');
+      showButton.click();
       
-      if (el.style.backgroundImage) {
-        const match = el.style.backgroundImage.match(/url\(&quot;([^&]*)&quot;\)|url\("([^"]*)"\)|url\(([^)]*)\)/);
-        if (match) {
-          url = match[1] || match[2] || match[3];
-          // Декодируем HTML entities
-          url = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
-        }
+      console.log('⏱️ Waiting 3 seconds for profile to load...');
+      await this.delay(3000);
+      
+      console.log('✅ Profile should now be open');
+      return true;
+    } catch (error) {
+      console.error('❌ Error clicking "Open Profile" button:', error);
+      return false;
+    }
+  }
+
+  async extractAllProfileData() {
+    console.log('🔍 Starting comprehensive profile extraction...');
+    
+    const data = {
+      name: 'Unknown',
+      age: null,
+      bio: '',
+      photos: [],
+      verified: false,
+      timestamp: Date.now(),
+      url: window.location.href
+    };
+    
+    try {
+      // 1. Extract name
+      console.log('📝 Extracting name...');
+      data.name = this.extractName();
+      console.log(`✅ Name: "${data.name}"`);
+      
+      // 2. Extract age
+      console.log('🎂 Extracting age...');
+      data.age = this.extractAge();
+      console.log(`✅ Age: ${data.age}`);
+      
+      // 3. Extract verification status
+      console.log('✅ Checking verification status...');
+      data.verified = this.extractVerificationStatus();
+      console.log(`✅ Verified: ${data.verified}`);
+      
+      // 4. Extract photos
+      console.log('📸 Extracting photos...');
+      data.photos = this.extractAllPhotos();
+      console.log(`✅ Photos: ${data.photos.length} found`);
+      
+      // 5. Extract bio
+      console.log('📄 Extracting bio...');
+      data.bio = this.extractBio();
+      console.log(`✅ Bio: ${data.bio.length} characters`);
+      
+      // Validate data quality
+      if (data.name === 'Unknown' || data.photos.length === 0) {
+        console.error('❌ Profile data quality insufficient');
+        console.error('- Name:', data.name);
+        console.error('- Photos:', data.photos.length);
+        return null;
       }
       
-      // Фильтруем только настоящие фото профилей
-      if (url && this.isValidProfilePhoto(url) && !photos.includes(url)) {
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Error during profile extraction:', error);
+      console.error('Stack trace:', error.stack);
+      return null;
+    }
+  }
+
+  extractName() {
+    const nameSelectors = [
+      'h1[class*="Typs(display-2-strong)"] span:first-child',
+      'h1 span.Pend\\(8px\\)',
+      'h1 span:first-child',
+      'h1'
+    ];
+    
+    for (const selector of nameSelectors) {
+      try {
+        const nameEl = document.querySelector(selector);
+        if (nameEl && nameEl.textContent.trim()) {
+          const name = this.cleanName(nameEl.textContent.trim());
+          console.log(`✅ Found name using ${selector}: "${name}"`);
+          return name;
+        }
+      } catch (e) {
+        console.log(`❌ Name selector failed: ${selector}`);
+      }
+    }
+    
+    console.log('❌ No name found');
+    return 'Unknown';
+  }
+
+  extractAge() {
+    const ageSelectors = [
+      'h1[class*="Typs(display-2-strong)"] span[class*="Typs(display-2-regular)"]',
+      'h1 span.Whs\\(nw\\)',
+      'h1 span:last-child'
+    ];
+    
+    for (const selector of ageSelectors) {
+      try {
+        const ageEl = document.querySelector(selector);
+        if (ageEl && ageEl.textContent.trim() && /^\d{1,2}$/.test(ageEl.textContent.trim())) {
+          const age = parseInt(ageEl.textContent.trim());
+          console.log(`✅ Found age using ${selector}: ${age}`);
+          return age;
+        }
+      } catch (e) {
+        console.log(`❌ Age selector failed: ${selector}`);
+      }
+    }
+    
+    console.log('❌ No age found');
+    return null;
+  }
+
+  extractVerificationStatus() {
+    const verificationSelectors = [
+      'svg[title="Verified!"]',
+      'svg[aria-label*="Verified"]',
+      '[title*="Verified"]'
+    ];
+    
+    for (const selector of verificationSelectors) {
+      try {
+        const verifiedEl = document.querySelector(selector);
+        if (verifiedEl) {
+          console.log(`✅ Found verification using ${selector}`);
+          return true;
+        }
+      } catch (e) {
+        console.log(`❌ Verification selector failed: ${selector}`);
+      }
+    }
+    
+    console.log('❌ Not verified');
+    return false;
+  }
+
+  extractAllPhotos() {
+    console.log('🔍 Starting photo extraction...');
+    const photos = [];
+    const processedUrls = new Set();
+    
+    // Method 1: Profile slider photos
+    console.log('📸 Method 1: Profile slider photos');
+    const sliderPhotos = document.querySelectorAll('.profileCard__slider__img[style*="background-image"]');
+    console.log(`Found ${sliderPhotos.length} slider photos`);
+    
+    sliderPhotos.forEach((el, i) => {
+      const url = this.extractUrlFromBackground(el);
+      if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
+        processedUrls.add(url);
         photos.push(url);
-        console.log(`📸 Photo ${photos.length}: ${url.substring(0, 80)}...`);
-        
-        // Ограничиваем количество фото
-        if (photos.length >= 10) {
-          console.log('📸 Reached photo limit (10), stopping search');
-          return;
-        }
+        console.log(`📸 Slider photo ${i + 1}: ${url.substring(0, 80)}...`);
       }
     });
-
-    console.log(`📸 Final result: Found ${photos.length} valid profile photos`);
+    
+    // Method 2: All elements with Profile Photo aria-label
+    console.log('📸 Method 2: Aria-label Profile Photo elements');
+    const ariaPhotos = document.querySelectorAll('[aria-label*="Profile Photo"][style*="background-image"]');
+    console.log(`Found ${ariaPhotos.length} aria-label photos`);
+    
+    ariaPhotos.forEach((el, i) => {
+      const url = this.extractUrlFromBackground(el);
+      if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
+        processedUrls.add(url);
+        photos.push(url);
+        console.log(`📸 Aria photo ${i + 1}: ${url.substring(0, 80)}...`);
+      }
+    });
+    
+    // Method 3: All background images (fallback)
+    if (photos.length < 3) {
+      console.log('📸 Method 3: All background images (fallback)');
+      const allBgImages = document.querySelectorAll('[style*="background-image"]');
+      console.log(`Found ${allBgImages.length} background images`);
+      
+      allBgImages.forEach((el, i) => {
+        const url = this.extractUrlFromBackground(el);
+        if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
+          processedUrls.add(url);
+          photos.push(url);
+          console.log(`📸 Fallback photo ${i + 1}: ${url.substring(0, 80)}...`);
+        }
+      });
+    }
+    
+    console.log(`📸 Total photos extracted: ${photos.length}`);
     return photos;
   }
 
-  async clickShowFullProfile(card) {
-    try {
-      // Ищем правильную кнопку "Open Profile" или информационную кнопку
-      const showProfileSelectors = [
-        'button:has([class*="Hidden"]:contains("Open Profile"))',
-        'button span.Hidden:contains("Open Profile")',
-        '[aria-label*="Open Profile"]',
-        '[aria-label*="Show Profile"]',
-        'button[class*="focus-button-style"]:has(span:contains("Open Profile"))',
-        // Кнопка с иконкой информации (i)
-        'button:has(svg path[d*="M12 0c6.627"])',
-        // Любая кнопка с текстом "Open Profile"
-        'button:has(span:contains("Open Profile"))'
-      ];
-      
-      let showButton = null;
-      
-      // Специальный поиск кнопки с "Open Profile" в span.Hidden
-      const buttons = document.querySelectorAll('button');
-      for (const btn of buttons) {
-        const hiddenSpan = btn.querySelector('span.Hidden');
-        if (hiddenSpan && hiddenSpan.textContent.trim() === 'Open Profile') {
-          showButton = btn;
-          console.log('🔍 Found "Open Profile" button by hidden span text');
-          break;
-        }
-      }
-      
-      // Fallback поиск
-      if (!showButton) {
-        for (const selector of showProfileSelectors) {
-          try {
-            showButton = document.querySelector(selector);
-            if (showButton) {
-              console.log(`🔍 Found show profile button using: ${selector}`);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-      }
-      
-      if (showButton) {
-        console.log('👆 Clicking "Open Profile" button for more data...');
-        showButton.click();
-        // Даем больше времени на загрузку дополнительных данных
-        await this.delay(2000);
-        console.log('✅ Clicked profile button, waiting for data to load...');
-      } else {
-        console.log('ℹ️ No "Open Profile" button found, using available data');
-      }
-    } catch (error) {
-      console.log('⚠️ Error clicking show profile:', error.message);
+  extractUrlFromBackground(element) {
+    if (!element || !element.style.backgroundImage) return null;
+    
+    const match = element.style.backgroundImage.match(/url\(["']?([^"')]+)["']?\)/);
+    if (match) {
+      return match[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"');
     }
+    return null;
   }
 
+  extractBio() {
+    console.log('📄 Extracting bio...');
+    
+    // Look for info containers
+    const containers = document.querySelectorAll('div[class*="P(24px)"][class*="W(100%)"]');
+    console.log(`Found ${containers.length} potential bio containers`);
+    
+    for (const container of containers) {
+      const text = container.textContent.trim();
+      if (text.length > 20 && 
+          !text.includes('Looking for') && 
+          !text.includes('Passions') &&
+          !text.includes('miles away')) {
+        console.log(`✅ Found bio: "${text.substring(0, 100)}..."`);
+        return text;
+      }
+    }
+    
+    console.log('❌ No bio found');
+    return '';
+  }
+
+  // Utility methods
   isValidProfilePhoto(url) {
-    // Проверяем что это настоящее фото профиля, а не иконка
     if (!url || !url.startsWith('http')) return false;
     
-    // Исключаем иконки и статические ресурсы
+    // Exclude icons and static resources
     const excludePatterns = [
       '/icons/',
       '/static-assets/',
@@ -436,50 +427,33 @@ class SimpleTinderSwiper {
       }
     }
     
-    // Включаем только фото из Tinder CDN
+    // Include only photos from Tinder CDN
     return url.includes('images-ssl.gotinder.com') || url.includes('gotinder.com/u/');
   }
 
   cleanName(rawName) {
     if (!rawName) return 'Unknown';
     
-    // Удаляем распространенные лишние части
+    // Remove common extra parts
     let cleaned = rawName
       .replace(/\d+Open Profile/gi, '') // "23Open Profile"
       .replace(/Open Profile/gi, '')     // "Open Profile"
-      .replace(/\d+$/, '')               // Числа в конце
-      .replace(/\s+/g, ' ')              // Множественные пробелы
+      .replace(/\d+$/, '')               // Numbers at end
+      .replace(/\s+/g, ' ')              // Multiple spaces
       .trim();
     
-    // Берем только первую часть (имя) до первого числа или специального символа
+    // Take only first part (name) before first number or special character
     const match = cleaned.match(/^([a-zA-Zà-ÿÀ-ÿ\u0100-\u017F\s]+)/);
     if (match) {
       cleaned = match[1].trim();
     }
     
-    // Если имя слишком длинное, берем только первое слово
+    // If name too long, take only first word
     if (cleaned.length > 20) {
       cleaned = cleaned.split(' ')[0];
     }
     
     return cleaned || 'Unknown';
-  }
-
-  extractAge(text) {
-    if (!text) return null;
-    
-    // Ищем числа от 18 до 65 (вероятный возраст)
-    const matches = text.match(/\b(\d{2})\b/g);
-    if (matches) {
-      for (const match of matches) {
-        const age = parseInt(match);
-        if (age >= 18 && age <= 65) {
-          return age;
-        }
-      }
-    }
-    
-    return null;
   }
 
   async requestDecision(profileData) {

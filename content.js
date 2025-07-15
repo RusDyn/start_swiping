@@ -218,32 +218,26 @@ class SimpleTinderSwiper {
     
     try {
       // 1. Extract name
-      console.log('📝 Extracting name...');
       data.name = this.extractName();
       console.log(`✅ Name: "${data.name}"`);
       
       // 2. Extract age
-      console.log('🎂 Extracting age...');
       data.age = this.extractAge();
       console.log(`✅ Age: ${data.age}`);
       
       // 3. Extract verification status
-      console.log('✅ Checking verification status...');
       data.verified = this.extractVerificationStatus();
       console.log(`✅ Verified: ${data.verified}`);
       
       // 4. Extract photos
-      console.log('📸 Extracting photos...');
       data.photos = await this.extractAllPhotos();
       console.log(`✅ Photos: ${data.photos.length} found`);
       
       // 5. Extract bio
-      console.log('📄 Extracting bio...');
       data.bio = this.extractBio();
       console.log(`✅ Bio: ${data.bio.length} characters`);
       
       // 6. Extract all profile info sections
-      console.log('📋 Extracting all profile info...');
       data.profileInfo = this.extractAllProfileInfo();
       console.log(`✅ Profile sections: ${Object.keys(data.profileInfo).length} found`);
       
@@ -314,7 +308,6 @@ class SimpleTinderSwiper {
   }
 
   extractVerificationStatus() {
-    console.log('🔍 Checking verification status...');
     
     const verificationSelectors = [
       'title[textContent="Verified!"]',
@@ -338,7 +331,6 @@ class SimpleTinderSwiper {
     }
     
     // Method 2: Look for title elements with "Verified!" text content
-    console.log('🔍 Checking title elements for "Verified!" text...');
     const titleElements = document.querySelectorAll('title');
     for (const title of titleElements) {
       if (title.textContent.trim() === 'Verified!') {
@@ -348,7 +340,6 @@ class SimpleTinderSwiper {
     }
     
     // Method 3: Look for SVG elements containing title with "Verified!"
-    console.log('🔍 Checking SVG elements for verification...');
     const svgElements = document.querySelectorAll('svg');
     for (const svg of svgElements) {
       const titleEl = svg.querySelector('title');
@@ -359,7 +350,6 @@ class SimpleTinderSwiper {
     }
     
     // Method 4: Check for verification badge/icon patterns
-    console.log('🔍 Checking for verification badge patterns...');
     const badgeElements = document.querySelectorAll('[class*="verified"], [class*="badge"], [data-testid*="verified"]');
     for (const badge of badgeElements) {
       if (badge.textContent.includes('Verified') || badge.getAttribute('aria-label')?.includes('Verified')) {
@@ -617,7 +607,6 @@ class SimpleTinderSwiper {
     // Method 1: Try clicking on photo navigation dots/indicators
     const indicators = document.querySelectorAll('[role="tab"]');
     if (indicators[photoIndex]) {
-      console.log(`👆 Clicking indicator ${photoIndex}`);
       indicators[photoIndex].click();
       return;
     }
@@ -685,7 +674,6 @@ class SimpleTinderSwiper {
         let sectionName = header.textContent.trim();
         // Clean up section names that have extra text
         sectionName = this.cleanSectionName(sectionName);
-        console.log(`📝 Processing section: "${sectionName}"`);
         
         switch (sectionName) {
           case 'Looking for':
@@ -720,14 +708,12 @@ class SimpleTinderSwiper {
               profileInfo.preferences = this.extractListInfo(container);
             } else {
               // Generic section handler
-              console.log(`📝 Unknown section "${sectionName}", using generic extraction`);
               profileInfo[this.sectionNameToKey(sectionName)] = this.extractGenericSection(container);
             }
         }
       }
     });
     
-    console.log(`✅ Extracted profile sections:`, Object.keys(profileInfo));
     return profileInfo;
   }
 
@@ -764,7 +750,6 @@ class SimpleTinderSwiper {
       }
     });
     
-    console.log(`✅ Extracted ${items.length} items from list`);
     return items;
   }
 
@@ -779,7 +764,6 @@ class SimpleTinderSwiper {
       }
     });
     
-    console.log(`✅ Extracted ${interests.length} interests`);
     return interests;
   }
 
@@ -824,7 +808,6 @@ class SimpleTinderSwiper {
       }
     });
     
-    console.log(`✅ Extracted ${spotifyItems.length} Spotify items`);
     return spotifyItems;
   }
 

@@ -168,7 +168,6 @@ class SimpleTinderSwiper {
   }
 
   async clickOpenProfileAndWait() {
-    console.log('🔍 Looking for "Open Profile" button...');
     
     // Find the "Open Profile" button
     const buttons = document.querySelectorAll('button');
@@ -194,7 +193,6 @@ class SimpleTinderSwiper {
       console.log('⏱️ Waiting 3 seconds for profile to load...');
       await this.delay(3000);
       
-      console.log('✅ Profile should now be open');
       return true;
     } catch (error) {
       console.error('❌ Error clicking "Open Profile" button:', error);
@@ -203,8 +201,6 @@ class SimpleTinderSwiper {
   }
 
   async extractAllProfileData() {
-    console.log('🔍 Starting comprehensive profile extraction...');
-    
     const data = {
       name: 'Unknown',
       age: null,
@@ -356,14 +352,11 @@ class SimpleTinderSwiper {
   }
 
   async extractAllPhotos() {
-    console.log('🔍 Starting photo extraction...');
     const photos = [];
     const processedUrls = new Set();
     
     // Method 1: Check keen-slider slides and get total count from aria-labels
-    console.log('📸 Method 1: Keen slider analysis');
     const keenSlides = document.querySelectorAll('.keen-slider__slide');
-    console.log(`Found ${keenSlides.length} keen-slider slides`);
     
     // Extract total photo count from aria-labels like "1 of 6"
     let totalPhotos = 0;
@@ -390,10 +383,8 @@ class SimpleTinderSwiper {
         }
       });
       
-      console.log(`📸 Added ${carouselPhotos.length} photos from carousel navigation`);
-    } else {
+      else {
       // Single photo - extract from current view
-      console.log('📸 Single photo detected, extracting from current view...');
       keenSlides.forEach((slide, i) => {
         const imgDiv = slide.querySelector('.profileCard__slider__img[style*="background-image"]');
         if (imgDiv) {
@@ -401,16 +392,13 @@ class SimpleTinderSwiper {
           if (url && this.isValidProfilePhoto(url) && !processedUrls.has(url)) {
             processedUrls.add(url);
             photos.push(url);
-            console.log(`📸 Keen slide ${i + 1}: ${url.substring(0, 80)}...`);
           }
         }
       });
     }
     
     // Method 2: All elements with Profile Photo aria-label
-    console.log('📸 Method 2: Aria-label Profile Photo elements');
     const ariaPhotos = document.querySelectorAll('[aria-label*="Profile Photo"][style*="background-image"]');
-    console.log(`Found ${ariaPhotos.length} aria-label photos`);
     
     ariaPhotos.forEach((el, i) => {
       const url = this.extractUrlFromBackground(el);
@@ -437,7 +425,6 @@ class SimpleTinderSwiper {
       });
     }
     
-    console.log(`📸 Total photos extracted: ${photos.length} (expected: ${totalPhotos})`);
     if (totalPhotos > 0 && photos.length < totalPhotos) {
       console.log(`⚠️ WARNING: Only found ${photos.length} photos but expected ${totalPhotos}. Photos might be lazy-loaded.`);
     }
@@ -641,12 +628,10 @@ class SimpleTinderSwiper {
   }
 
   extractAllProfileInfo() {
-    console.log('🔍 Extracting all profile info sections...');
     const profileInfo = {};
     
     // Find all info containers
     const containers = document.querySelectorAll('div[class*="P(24px)"][class*="W(100%)"]');
-    console.log(`Found ${containers.length} info containers`);
     
     containers.forEach((container) => {
       // Look for section header

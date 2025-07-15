@@ -27,6 +27,9 @@ class PopupController {
     // Загружаем сохраненные настройки
     await this.loadSettings();
     
+    // Проверяем текущее состояние swiper
+    await this.checkSwiperStatus();
+    
     // Привязываем события
     this.bindEvents();
     
@@ -166,8 +169,29 @@ class PopupController {
     this.elements.status.className = `status ${this.isRunning ? 'running' : 'stopped'}`;
   }
 
+  async checkSwiperStatus() {
+    if (!this.currentTab.url.includes('tinder.com')) {
+      return;
+    }
+
+    try {
+      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
+        action: 'getStatus'
+      });
+
+      if (response && response.isRunning !== undefined) {
+        this.isRunning = response.isRunning;
+        this.updateUI();
+        console.log('Swiper status synced:', this.isRunning ? 'running' : 'stopped');
+      }
+    } catch (error) {
+      // Content script not ready
+      console.log('Could not check swiper status - content script may not be ready');
+    }
+  }
+
   async updateStats() {
-    if (!this.currentTab.url.includes('tinder.com') || !this.isRunning) {
+    if (!this.currentTab.url.includes('tinder.com')) {
       return;
     }
 
@@ -177,6 +201,13 @@ class PopupController {
       });
 
       if (response) {
+        // Update running status from response
+        if (response.isRunning !== undefined && response.isRunning !== this.isRunning) {
+          console.log('Swiper status changed:', response.isRunning ? 'started' : 'stopped');
+          this.isRunning = response.isRunning;
+          this.updateUI();
+        }
+
         this.elements.statsTotal.textContent = response.total || 0;
         this.elements.statsLikes.textContent = response.likes || 0;
         this.elements.statsPasses.textContent = response.passes || 0;

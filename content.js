@@ -374,14 +374,12 @@ class SimpleTinderSwiper {
         const match = ariaLabel.match(/\d+ of (\d+)/);
         if (match) {
           totalPhotos = parseInt(match[1]);
-          console.log(`📊 Total photos detected from aria-label: ${totalPhotos}`);
         }
       }
     }
     
     // If we have multiple photos, navigate through carousel to collect them
     if (totalPhotos > 1) {
-      console.log(`🔄 Navigating through ${totalPhotos} photos to collect them...`);
       const carouselPhotos = await this.loadAllPhotosFromCarousel(totalPhotos);
       
       // Add carousel photos to our collection
@@ -551,7 +549,6 @@ class SimpleTinderSwiper {
   }
 
   async loadAllPhotosFromCarousel(totalPhotos) {
-    console.log('🔄 Starting carousel navigation to collect photos...');
     const photos = [];
     const processedUrls = new Set();
     

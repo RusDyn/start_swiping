@@ -4,11 +4,11 @@ A Chrome Extension (Manifest V3) that automates swiping on Tinder by integrating
 
 ## Features
 
-- **Multi-Step Decision Process**: Two-stage analysis with text-based decisions first, then individual image analysis
+- **Multi-Step Decision Process**: Two-stage analysis with text-based decisions first, then batch image analysis
 - **Smart Profile Analysis**: Extracts comprehensive profile data including photos, bio, age, interests, and more
 - **Dual API Integration**: Separate endpoints for text-based and image-based decision making
 - **Real-time Statistics**: Tracks likes, passes, errors, and success rates
-- **Efficient Photo Processing**: Only processes images after positive text feedback
+- **Efficient Photo Processing**: Processes all images at once after positive text feedback
 - **Comprehensive Profile Info**: Extracts all profile sections including "Looking for", "Essentials", "Basics", "Lifestyle", "Interests", and Spotify data
 
 ## Installation
@@ -34,7 +34,7 @@ A Chrome Extension (Manifest V3) that automates swiping on Tinder by integrating
 The extension follows a two-stage decision process:
 
 1. **Text Analysis**: Profile data (name, age, bio, interests) is sent to the text API endpoint
-2. **Image Analysis**: If text analysis is positive, each photo is processed individually via the image API endpoint
+2. **Image Analysis**: If text analysis is positive, all photos are sent at once to the image API endpoint
 3. **Final Decision**: The extension executes the swipe based on the combined analysis results
 
 ## API Endpoint Specification
@@ -120,7 +120,7 @@ The extension uses two separate API endpoints for the two-stage decision process
 
 ### Image API Endpoint
 
-**Purpose**: Analyzes individual photos after positive text feedback. Called once per photo.
+**Purpose**: Analyzes all photos at once after positive text feedback. Called once per profile.
 
 **Endpoint**: Your configured image API URL (e.g., `https://your-api.com/image-decide`)  
 **Method**: `POST`  
@@ -132,10 +132,15 @@ The extension uses two separate API endpoints for the two-stage decision process
 ```json
 {
   "userId": "user_abc123def",
-  "imageUrl": "https://images-ssl.gotinder.com/u/abc123/photo2.jpg",
-  "imageIndex": 1,
+  "imageUrls": [
+    "https://images-ssl.gotinder.com/u/abc123/photo1.jpg",
+    "https://images-ssl.gotinder.com/u/abc123/photo2.jpg",
+    "https://images-ssl.gotinder.com/u/abc123/photo3.jpg",
+    "https://images-ssl.gotinder.com/u/abc123/photo4.jpg"
+  ],
   "totalImages": 4,
   "profileName": "Emma",
+  "skipThreshold": 6,
   "swipeCount": 42,
   "stats": {
     "total": 42,
@@ -158,8 +163,8 @@ The extension uses two separate API endpoints for the two-stage decision process
 ```
 
 **Image API Actions**:
-- **`"like"` or `"right"`**: Continue to next image (or swipe right if last image)
-- **`"pass"`, `"left"`, or `"skip"`**: Skip profile immediately (stop processing remaining images)
+- **`"like"` or `"right"`**: Swipe right on the profile
+- **`"pass"`, `"left"`, or `"skip"`**: Skip profile immediately
 
 ### Common Response Fields
 
@@ -189,15 +194,11 @@ The extension uses two separate API endpoints for the two-stage decision process
    - **"stop"**: Stop automation
 
 ### Stage 2: Image Analysis (Only if text decision was positive)
-1. Extension slides through each photo in the carousel
-2. For each photo:
-   - Slide to the image position
-   - Extract the current image URL
-   - Send image data to the **image API endpoint**
-   - Process the response:
-     - **"like"/"right"**: Continue to next image
-     - **"pass"/"left"/"skip"**: Skip entire profile immediately
-3. If all images receive positive feedback, swipe right on the profile
+1. Extension extracts all image URLs from the profile carousel
+2. All images are sent together to the **image API endpoint**
+3. Process the response:
+   - **"like"/"right"**: Swipe right on the profile
+   - **"pass"/"left"/"skip"**: Skip entire profile immediately
 
 ## Profile Data Structure
 
@@ -220,10 +221,10 @@ The extension extracts comprehensive profile information:
 - **topArtists**: Favorite artists from Spotify
 
 ### Image Data (Sent to Image API)
-- **imageUrl**: Full-resolution image URL from Tinder CDN
-- **imageIndex**: 0-based index of current image
+- **imageUrls**: Array of full-resolution image URLs from Tinder CDN
 - **totalImages**: Total number of images in the profile
 - **profileName**: Name of the profile being analyzed
+- **skipThreshold**: Maximum number of skip decisions before skipping profile
 
 ## Development
 

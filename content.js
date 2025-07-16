@@ -8,7 +8,7 @@ class SimpleTinderSwiper {
       textApiEndpoint: 'https://your-api.com/text-decide', // Text analysis endpoint
       imageApiEndpoint: 'https://your-api.com/image-decide', // Image analysis endpoint
       maxSwipes: 200,
-      skipAfterImages: 2, // Default: skip after N skip decisions
+      skipAfterImages: 6, // Default: skip after N skip decisions (max photos)
       userId: this.generateUserId()
     };
     
@@ -127,8 +127,7 @@ class SimpleTinderSwiper {
         console.log('\n✅ PROFILE DATA EXTRACTED:', {
           name: profileData.name,
           age: profileData.age,
-          firstPhotoExtracted: profileData.photos.length > 0,
-          totalPhotos: this.totalPhotos || 1,
+          photosExtracted: profileData.photos.length,
           bioLength: profileData.bio.length,
           verified: profileData.verified
         });
@@ -150,36 +149,15 @@ class SimpleTinderSwiper {
           console.log('⏭️ Skipping profile based on text analysis');
           await this.executeSwipe(textDecision);
         } else if (textDecision.action === 'like' || textDecision.action === 'right') {
-          // Step 3.2: Process images one by one with sliding (only for positive text feedback)
-          const totalPhotos = this.totalPhotos || 1;
-          console.log(`✅ Text analysis positive - processing all ${totalPhotos} images (skip after ${this.config.skipAfterImages} skip decisions)...`);
+          // Step 3.2: Process all images at once (only for positive text feedback)
+          console.log(`✅ Text analysis positive - processing all ${profileData.photos.length} images at once...`);
           
-          let skipCount = 0;
-          let shouldSkipProfile = false;
-          
-          for (let i = 0; i < totalPhotos; i++) {
-            // Slide to the image before analyzing it
-            if (i > 0) {
-              console.log(`🔄 Sliding to image ${i + 1}/${totalPhotos}`);
-              await this.slideToImage(i);
-              // Wait for image to load after sliding
-              await this.delay(1000);
-            }
-            
-            // Extract current image URL after sliding
-            const imageUrl = this.extractCurrentActivePhoto();
-            console.log(`📸 Analyzing image ${i + 1}/${totalPhotos} (skip count: ${skipCount}/${this.config.skipAfterImages})`);
-            
-            if (!imageUrl) {
-              console.error(`❌ Could not extract image URL for image ${i + 1}. Skipping to next image.`);
-              continue;
-            }
-            
+          if (profileData.photos.length > 0) {
             const imageDecision = await this.requestImageDecision({ 
-              imageUrl: imageUrl,
-              imageIndex: i,
-              totalImages: totalPhotos,
-              name: profileData.name 
+              imageUrls: profileData.photos,
+              totalImages: profileData.photos.length,
+              name: profileData.name,
+              skipThreshold: this.config.skipAfterImages
             });
             
             if (!imageDecision) {
@@ -188,26 +166,15 @@ class SimpleTinderSwiper {
               return; // Exit the entire swipe loop
             }
             
-            // Count skip decisions
             if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
-              skipCount++;
-              console.log(`⏭️ Image ${i + 1} voted to skip (skip count: ${skipCount}/${this.config.skipAfterImages})`);
-              
-              // If we've reached the skip threshold, skip the entire profile
-              if (skipCount >= this.config.skipAfterImages) {
-                console.log(`🚫 Skipping profile - reached ${skipCount} skip decisions threshold`);
-                finalDecision = imageDecision;
-                shouldSkipProfile = true;
-                break;
-              }
+              console.log('🚫 Skipping profile based on image analysis');
+              finalDecision = imageDecision;
             } else {
-              console.log(`✅ Image ${i + 1} voted to like`);
+              console.log('💕 Image analysis positive - proceeding with like decision');
+              finalDecision = textDecision;
             }
-          }
-          
-          // If we didn't skip the profile, use the text decision (like)
-          if (!shouldSkipProfile) {
-            console.log(`💕 All images processed - proceeding with like decision`);
+          } else {
+            console.log('⚠️ No images found - proceeding with text decision');
             finalDecision = textDecision;
           }
           
@@ -295,8 +262,8 @@ class SimpleTinderSwiper {
       // 3. Extract verification status
       data.verified = this.extractVerificationStatus();
       
-      // 4. Extract photos (get first photo only, don't slide through all)
-      data.photos = await this.extractFirstPhotoOnly();
+      // 4. Extract all photos at once
+      data.photos = await this.extractAllPhotos();
       
       // 5. Extract bio
       data.bio = this.extractBio();
@@ -1009,15 +976,16 @@ class SimpleTinderSwiper {
     try {
       const requestPayload = {
         userId: this.config.userId,
-        imageUrl: imageData.imageUrl,
+        imageUrls: imageData.imageUrls || [imageData.imageUrl], // Support both single and multiple images
         imageIndex: imageData.imageIndex,
         totalImages: imageData.totalImages,
         profileName: imageData.name,
+        skipThreshold: imageData.skipThreshold,
         swipeCount: this.swipeCount,
         stats: this.stats
       };
       
-      console.log('🌐 Requesting image-based decision from API...');
+      console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
       
       const endpoint = this.config.imageApiEndpoint || this.config.apiEndpoint;
       const controller = new AbortController();

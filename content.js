@@ -942,14 +942,20 @@ class SimpleTinderSwiper {
       console.log('🌐 Requesting text-based decision from API...');
       
       const endpoint = this.config.textApiEndpoint || this.config.apiEndpoint;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'TinderSwiper/1.0'
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Text API responded with ${response.status}`);
@@ -995,14 +1001,20 @@ class SimpleTinderSwiper {
       console.log('🌐 Requesting image-based decision from API...');
       
       const endpoint = this.config.imageApiEndpoint || this.config.apiEndpoint;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'TinderSwiper/1.0'
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Image API responded with ${response.status}`);

@@ -126,7 +126,8 @@ class SimpleTinderSwiper {
         console.log('\n✅ PROFILE DATA EXTRACTED:', {
           name: profileData.name,
           age: profileData.age,
-          photoCount: profileData.photos.length,
+          firstPhotoExtracted: profileData.photos.length > 0,
+          totalPhotos: this.totalPhotos || 1,
           bioLength: profileData.bio.length,
           verified: profileData.verified
         });
@@ -149,24 +150,31 @@ class SimpleTinderSwiper {
           await this.executeSwipe(textDecision);
         } else if (textDecision.action === 'like' || textDecision.action === 'right') {
           // Step 3.2: Process images one by one with sliding (only for positive text feedback)
-          console.log(`✅ Text analysis positive - processing ${profileData.photos.length} images individually...`);
+          const totalPhotos = this.totalPhotos || 1;
+          console.log(`✅ Text analysis positive - processing ${totalPhotos} images individually...`);
           
-          for (let i = 0; i < profileData.photos.length; i++) {
+          for (let i = 0; i < totalPhotos; i++) {
             // Slide to the image before analyzing it
             if (i > 0) {
-              console.log(`🔄 Sliding to image ${i + 1}/${profileData.photos.length}`);
+              console.log(`🔄 Sliding to image ${i + 1}/${totalPhotos}`);
               await this.slideToImage(i);
               // Wait for image to load after sliding
               await this.delay(1000);
             }
             
-            const imageUrl = profileData.photos[i];
-            console.log(`📸 Analyzing image ${i + 1}/${profileData.photos.length}`);
+            // Extract current image URL after sliding
+            const imageUrl = this.extractCurrentActivePhoto();
+            console.log(`📸 Analyzing image ${i + 1}/${totalPhotos}`);
+            
+            if (!imageUrl) {
+              console.error(`❌ Could not extract image URL for image ${i + 1}. Skipping to next image.`);
+              continue;
+            }
             
             const imageDecision = await this.requestImageDecision({ 
               imageUrl: imageUrl,
               imageIndex: i,
-              totalImages: profileData.photos.length,
+              totalImages: totalPhotos,
               name: profileData.name 
             });
             
@@ -268,8 +276,8 @@ class SimpleTinderSwiper {
       // 3. Extract verification status
       data.verified = this.extractVerificationStatus();
       
-      // 4. Extract photos
-      data.photos = await this.extractAllPhotos();
+      // 4. Extract photos (get first photo only, don't slide through all)
+      data.photos = await this.extractFirstPhotoOnly();
       
       // 5. Extract bio
       data.bio = this.extractBio();
@@ -277,11 +285,10 @@ class SimpleTinderSwiper {
       // 6. Extract all profile info sections
       data.profileInfo = this.extractAllProfileInfo();
       
-      // Validate data quality
-      if (data.name === 'Unknown' || data.photos.length === 0) {
+      // Validate data quality (only check name for text analysis)
+      if (data.name === 'Unknown') {
         console.error('❌ Profile data quality insufficient');
         console.error('- Name:', data.name);
-        console.error('- Photos:', data.photos.length);
         return null;
       }
       
@@ -390,6 +397,58 @@ class SimpleTinderSwiper {
     
     console.log('❌ Not verified');
     return false;
+  }
+
+  async extractFirstPhotoOnly() {
+    // Extract only the first photo without sliding through carousel
+    const photos = [];
+    
+    try {
+      // Method 1: Get first photo from keen-slider
+      const firstSlide = document.querySelector('.keen-slider__slide');
+      if (firstSlide) {
+        const imgDiv = firstSlide.querySelector('.profileCard__slider__img[style*="background-image"]');
+        if (imgDiv) {
+          const url = this.extractUrlFromBackground(imgDiv);
+          if (url && this.isValidProfilePhoto(url)) {
+            photos.push(url);
+          }
+        }
+      }
+      
+      // Method 2: Try aria-label method for first photo
+      if (photos.length === 0) {
+        const firstAriaPhoto = document.querySelector('[aria-label*="Profile Photo"][style*="background-image"]');
+        if (firstAriaPhoto) {
+          const url = this.extractUrlFromBackground(firstAriaPhoto);
+          if (url && this.isValidProfilePhoto(url)) {
+            photos.push(url);
+          }
+        }
+      }
+      
+      // Method 3: Get total photo count for later use
+      const keenSlides = document.querySelectorAll('.keen-slider__slide');
+      if (keenSlides.length > 0) {
+        const firstSlide = keenSlides[0];
+        const ariaLabel = firstSlide.getAttribute('aria-label');
+        if (ariaLabel) {
+          const match = ariaLabel.match(/\d+ of (\d+)/);
+          if (match) {
+            const totalPhotos = parseInt(match[1]);
+            // Store total count for later use in image processing
+            this.totalPhotos = totalPhotos;
+            console.log(`📸 Found ${totalPhotos} total photos (extracted first only)`);
+          }
+        }
+      }
+      
+      return photos;
+      
+    } catch (error) {
+      console.error('❌ Error extracting first photo:', error);
+      return [];
+    }
   }
 
   async extractAllPhotos() {

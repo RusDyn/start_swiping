@@ -11,6 +11,7 @@ class PopupController {
       textUrlStatus: document.getElementById('textUrlStatus'),
       imageUrlStatus: document.getElementById('imageUrlStatus'),
       maxSwipes: document.getElementById('maxSwipes'),
+      skipAfterImages: document.getElementById('skipAfterImages'),
       startBtn: document.getElementById('startBtn'),
       stopBtn: document.getElementById('stopBtn'),
       statsTotal: document.getElementById('statsTotal'),
@@ -51,7 +52,8 @@ class PopupController {
     const settings = await chrome.storage.local.get([
       'textApiEndpoint',
       'imageApiEndpoint',
-      'maxSwipes'
+      'maxSwipes',
+      'skipAfterImages'
     ]);
     
     if (settings.textApiEndpoint) {
@@ -71,13 +73,18 @@ class PopupController {
     if (settings.maxSwipes) {
       this.elements.maxSwipes.value = settings.maxSwipes;
     }
+    
+    if (settings.skipAfterImages) {
+      this.elements.skipAfterImages.value = settings.skipAfterImages;
+    }
   }
 
   async saveSettings() {
     const settings = {
       textApiEndpoint: this.elements.textApiEndpoint.value,
       imageApiEndpoint: this.elements.imageApiEndpoint.value,
-      maxSwipes: parseInt(this.elements.maxSwipes.value)
+      maxSwipes: parseInt(this.elements.maxSwipes.value),
+      skipAfterImages: parseInt(this.elements.skipAfterImages.value)
     };
     
     await chrome.storage.local.set(settings);
@@ -107,6 +114,7 @@ class PopupController {
     this.elements.textApiEndpoint.onchange = () => this.saveSettings();
     this.elements.imageApiEndpoint.onchange = () => this.saveSettings();
     this.elements.maxSwipes.onchange = () => this.saveSettings();
+    this.elements.skipAfterImages.onchange = () => this.saveSettings();
   }
 
   async startSwiping() {
@@ -127,7 +135,8 @@ class PopupController {
     const config = {
       textApiEndpoint: this.elements.textApiEndpoint.value,
       imageApiEndpoint: this.elements.imageApiEndpoint.value,
-      maxSwipes: parseInt(this.elements.maxSwipes.value)
+      maxSwipes: parseInt(this.elements.maxSwipes.value),
+      skipAfterImages: parseInt(this.elements.skipAfterImages.value)
     };
 
     try {

@@ -8,6 +8,7 @@ class SimpleTinderSwiper {
       textApiEndpoint: 'https://your-api.com/text-decide', // Text analysis endpoint
       imageApiEndpoint: 'https://your-api.com/image-decide', // Image analysis endpoint
       maxSwipes: 200,
+      skipAfterImages: 2, // Default: skip after N skip decisions
       userId: this.generateUserId()
     };
     
@@ -151,7 +152,10 @@ class SimpleTinderSwiper {
         } else if (textDecision.action === 'like' || textDecision.action === 'right') {
           // Step 3.2: Process images one by one with sliding (only for positive text feedback)
           const totalPhotos = this.totalPhotos || 1;
-          console.log(`✅ Text analysis positive - processing ${totalPhotos} images individually...`);
+          console.log(`✅ Text analysis positive - processing all ${totalPhotos} images (skip after ${this.config.skipAfterImages} skip decisions)...`);
+          
+          let skipCount = 0;
+          let shouldSkipProfile = false;
           
           for (let i = 0; i < totalPhotos; i++) {
             // Slide to the image before analyzing it
@@ -164,7 +168,7 @@ class SimpleTinderSwiper {
             
             // Extract current image URL after sliding
             const imageUrl = this.extractCurrentActivePhoto();
-            console.log(`📸 Analyzing image ${i + 1}/${totalPhotos}`);
+            console.log(`📸 Analyzing image ${i + 1}/${totalPhotos} (skip count: ${skipCount}/${this.config.skipAfterImages})`);
             
             if (!imageUrl) {
               console.error(`❌ Could not extract image URL for image ${i + 1}. Skipping to next image.`);
@@ -184,12 +188,27 @@ class SimpleTinderSwiper {
               return; // Exit the entire swipe loop
             }
             
-            // If any image says skip, we skip the entire profile
+            // Count skip decisions
             if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
-              console.log(`⏭️ Skipping profile based on image ${i + 1}`);
-              finalDecision = imageDecision;
-              break;
+              skipCount++;
+              console.log(`⏭️ Image ${i + 1} voted to skip (skip count: ${skipCount}/${this.config.skipAfterImages})`);
+              
+              // If we've reached the skip threshold, skip the entire profile
+              if (skipCount >= this.config.skipAfterImages) {
+                console.log(`🚫 Skipping profile - reached ${skipCount} skip decisions threshold`);
+                finalDecision = imageDecision;
+                shouldSkipProfile = true;
+                break;
+              }
+            } else {
+              console.log(`✅ Image ${i + 1} voted to like`);
             }
+          }
+          
+          // If we didn't skip the profile, use the text decision (like)
+          if (!shouldSkipProfile) {
+            console.log(`💕 All images processed - proceeding with like decision`);
+            finalDecision = textDecision;
           }
           
           // STEP 4: Execute final swipe decision

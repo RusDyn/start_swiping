@@ -438,7 +438,6 @@ class SimpleTinderSwiper {
             const totalPhotos = parseInt(match[1]);
             // Store total count for later use in image processing
             this.totalPhotos = totalPhotos;
-            console.log(`📸 Found ${totalPhotos} total photos (extracted first only)`);
           }
         }
       }
@@ -511,7 +510,6 @@ class SimpleTinderSwiper {
     // Method 3: All background images (fallback)
     if (photos.length < Math.min(totalPhotos, 3)) {
       const allBgImages = document.querySelectorAll('[style*="background-image"]');
-      console.log(`Found ${allBgImages.length} background images`);
       
       allBgImages.forEach((el, i) => {
         const url = this.extractUrlFromBackground(el);

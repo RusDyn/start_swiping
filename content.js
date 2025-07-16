@@ -115,26 +115,25 @@ class SimpleTinderSwiper {
           break;
         }
         
-        // STEP 2: Extract all profile data
-        const profileData = await this.extractAllProfileData();
+        // STEP 2: Extract text-only profile data first
+        const textProfileData = await this.extractTextOnlyProfileData();
         
-        if (!profileData) {
-          console.error('❌ No profile data extracted. Stopping.');
+        if (!textProfileData) {
+          console.error('❌ No text profile data extracted. Stopping.');
           this.stop();
           break;
         }
         
-        console.log('\n✅ PROFILE DATA EXTRACTED:', {
-          name: profileData.name,
-          age: profileData.age,
-          photosExtracted: profileData.photos.length,
-          bioLength: profileData.bio.length,
-          verified: profileData.verified
+        console.log('\n✅ TEXT PROFILE DATA EXTRACTED:', {
+          name: textProfileData.name,
+          age: textProfileData.age,
+          bioLength: textProfileData.bio.length,
+          verified: textProfileData.verified
         });
         
         // STEP 3: Multi-step decision process
         // Step 3.1: Send text data first
-        const textDecision = await this.requestTextDecision(profileData);
+        const textDecision = await this.requestTextDecision(textProfileData);
         
         if (!textDecision) {
           console.error('❌ No decision from API. Stopping.');
@@ -149,14 +148,18 @@ class SimpleTinderSwiper {
           console.log('⏭️ Skipping profile based on text analysis');
           await this.executeSwipe(textDecision);
         } else if (textDecision.action === 'like' || textDecision.action === 'right') {
-          // Step 3.2: Process all images at once (only for positive text feedback)
-          console.log(`✅ Text analysis positive - processing all ${profileData.photos.length} images at once...`);
+          // Step 3.2: Extract images only after positive text analysis
+          console.log('✅ Text analysis positive - now extracting images...');
           
-          if (profileData.photos.length > 0) {
+          const profileDataWithImages = await this.extractImageDataForProfile(textProfileData);
+          
+          console.log(`📸 Images extracted: ${profileDataWithImages.photos.length} photos`);
+          
+          if (profileDataWithImages.photos.length > 0) {
             const imageDecision = await this.requestImageDecision({ 
-              imageUrls: profileData.photos,
-              totalImages: profileData.photos.length,
-              name: profileData.name,
+              imageUrls: profileDataWithImages.photos,
+              totalImages: profileDataWithImages.photos.length,
+              name: profileDataWithImages.name,
               skipThreshold: this.config.skipAfterImages
             });
             
@@ -238,6 +241,67 @@ class SimpleTinderSwiper {
     } catch (error) {
       console.error('❌ Error clicking "Open Profile" button:', error);
       return false;
+    }
+  }
+
+  async extractTextOnlyProfileData() {
+    const data = {
+      name: 'Unknown',
+      age: null,
+      bio: '',
+      photos: [],
+      verified: false,
+      timestamp: Date.now(),
+      url: window.location.href
+    };
+    
+    try {
+      // 1. Extract name
+      data.name = this.extractName();
+      
+      // 2. Extract age
+      data.age = this.extractAge();
+      
+      // 3. Extract verification status
+      data.verified = this.extractVerificationStatus();
+      
+      // 4. Extract bio
+      data.bio = this.extractBio();
+      
+      // 5. Extract all profile info sections
+      data.profileInfo = this.extractAllProfileInfo();
+      
+      // Validate data quality (only check name for text analysis)
+      if (data.name === 'Unknown') {
+        console.error('❌ Profile data quality insufficient');
+        console.error('- Name:', data.name);
+        return null;
+      }
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Error during text profile extraction:', error);
+      console.error('Stack trace:', error.stack);
+      return null;
+    }
+  }
+
+  async extractImageDataForProfile(profileData) {
+    try {
+      // Extract all photos
+      const photos = await this.extractAllPhotos();
+      
+      // Add photos to existing profile data
+      return {
+        ...profileData,
+        photos: photos
+      };
+      
+    } catch (error) {
+      console.error('❌ Error during image extraction:', error);
+      console.error('Stack trace:', error.stack);
+      return profileData; // Return original data without photos if extraction fails
     }
   }
 
@@ -985,7 +1049,7 @@ class SimpleTinderSwiper {
         stats: this.stats
       };
       
-      console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
+      //console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
       
       const endpoint = this.config.imageApiEndpoint || this.config.apiEndpoint;
       const controller = new AbortController();

@@ -148,12 +148,20 @@ class SimpleTinderSwiper {
           console.log('⏭️ Skipping profile based on text analysis');
           await this.executeSwipe(textDecision);
         } else {
-          // Step 3.2: Process images one by one
+          // Step 3.2: Process images one by one with sliding
           console.log(`🖼️ Processing ${profileData.photos.length} images individually...`);
           
           for (let i = 0; i < profileData.photos.length; i++) {
+            // Slide to the image before analyzing it
+            if (i > 0) {
+              console.log(`🔄 Sliding to image ${i + 1}/${profileData.photos.length}`);
+              await this.slideToImage(i);
+              // Wait for image to load after sliding
+              await this.delay(1000);
+            }
+            
             const imageUrl = profileData.photos[i];
-            console.log(`📸 Checking image ${i + 1}/${profileData.photos.length}`);
+            console.log(`📸 Analyzing image ${i + 1}/${profileData.photos.length}`);
             
             const imageDecision = await this.requestImageDecision({ 
               imageUrl: imageUrl,
@@ -163,8 +171,9 @@ class SimpleTinderSwiper {
             });
             
             if (!imageDecision) {
-              console.error('❌ No decision from image API. Using text decision.');
-              break;
+              console.error('❌ Image API request failed. Stopping swiping completely.');
+              this.stop();
+              return; // Exit the entire swipe loop
             }
             
             // If any image says skip, we skip the entire profile
@@ -612,6 +621,36 @@ class SimpleTinderSwiper {
     return;
   }
   
+  async slideToImage(imageIndex) {
+    // Find the photo container
+    const photoContainer = document.querySelector('.keen-slider');
+    if (!photoContainer) {
+      console.log('❌ No keen-slider container found for sliding');
+      return false;
+    }
+    
+    // Method 1: Try clicking on photo navigation dots/indicators
+    const indicators = document.querySelectorAll('[role="tab"]');
+    if (indicators[imageIndex]) {
+      console.log(`📍 Clicking indicator ${imageIndex + 1}`);
+      indicators[imageIndex].click();
+      return true;
+    }
+    
+    // Method 2: Try keyboard navigation (multiple right arrows)
+    console.log(`⌨️ Using keyboard navigation to slide to image ${imageIndex + 1}`);
+    for (let i = 0; i < imageIndex; i++) {
+      photoContainer.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        bubbles: true,
+        cancelable: true
+      }));
+      await this.delay(200); // Small delay between keystrokes
+    }
+    
+    return true;
+  }
+  
   extractCurrentActivePhoto() {
     // Method 1: Look for currently visible/active slide
     const activeSlides = document.querySelectorAll('.keen-slider__slide[aria-hidden="false"]');
@@ -920,16 +959,11 @@ class SimpleTinderSwiper {
 
     } catch (error) {
       console.error('❌ Image API request failed:', error);
-      console.log('🛑 Stopping swiper due to API unavailability');
+      console.log('🛑 Stopping swiper due to image API unavailability');
       
       this.stop();
       
-      return {
-        action: 'stop',
-        reason: 'Image API unavailable - stopping swiper',
-        confidence: 1.0,
-        nextDelay: 0
-      };
+      return null; // Return null so calling code can handle the failure
     }
   }
 

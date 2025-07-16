@@ -143,13 +143,13 @@ class SimpleTinderSwiper {
         
         let finalDecision = textDecision; // Initialize here for scope
         
-        // Check if we should skip based on text alone
+        // Check text decision result
         if (textDecision.action === 'skip' || textDecision.action === 'pass' || textDecision.action === 'left') {
           console.log('⏭️ Skipping profile based on text analysis');
           await this.executeSwipe(textDecision);
-        } else {
-          // Step 3.2: Process images one by one with sliding
-          console.log(`🖼️ Processing ${profileData.photos.length} images individually...`);
+        } else if (textDecision.action === 'like' || textDecision.action === 'right') {
+          // Step 3.2: Process images one by one with sliding (only for positive text feedback)
+          console.log(`✅ Text analysis positive - processing ${profileData.photos.length} images individually...`);
           
           for (let i = 0; i < profileData.photos.length; i++) {
             // Slide to the image before analyzing it
@@ -186,6 +186,10 @@ class SimpleTinderSwiper {
           
           // STEP 4: Execute final swipe decision
           await this.executeSwipe(finalDecision);
+        } else {
+          // Unknown text decision - default to text decision without image processing
+          console.log(`⚠️ Unknown text decision "${textDecision.action}" - executing without image analysis`);
+          await this.executeSwipe(textDecision);
         }
         
         // Wait before next profile

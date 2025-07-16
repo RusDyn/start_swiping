@@ -143,8 +143,15 @@
   <!-- Configuration Section -->
   <div class="section">
     <div class="control-group">
-      <label for="apiEndpoint">API Endpoint:</label>
-      <input type="url" id="apiEndpoint" placeholder="http://localhost:3000/decide">
+      <label for="textApiEndpoint">Text API Endpoint:</label>
+      <input type="url" id="textApiEndpoint" placeholder="http://localhost:3000/text-decide">
+      <div id="textUrlStatus" class="url-status" style="display: none;"></div>
+    </div>
+
+    <div class="control-group">
+      <label for="imageApiEndpoint">Image API Endpoint:</label>
+      <input type="url" id="imageApiEndpoint" placeholder="http://localhost:3000/image-decide">
+      <div id="imageUrlStatus" class="url-status" style="display: none;"></div>
     </div>
 
     <div class="control-group">
@@ -195,7 +202,8 @@
 
   <!-- Quick Setup Links -->
   <div style="margin-top: 15px; font-size: 11px; text-align: center; color: #666;">
-    <div>Default: http://localhost:3000/decide</div>
+    <div>Text API: http://localhost:3000/text-decide</div>
+    <div>Image API: http://localhost:3000/image-decide</div>
   </div>
 
   <script src="popup.js"></script>

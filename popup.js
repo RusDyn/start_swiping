@@ -6,7 +6,10 @@ class PopupController {
     
     this.elements = {
       status: document.getElementById('status'),
-      apiEndpoint: document.getElementById('apiEndpoint'),
+      textApiEndpoint: document.getElementById('textApiEndpoint'),
+      imageApiEndpoint: document.getElementById('imageApiEndpoint'),
+      textUrlStatus: document.getElementById('textUrlStatus'),
+      imageUrlStatus: document.getElementById('imageUrlStatus'),
       maxSwipes: document.getElementById('maxSwipes'),
       startBtn: document.getElementById('startBtn'),
       stopBtn: document.getElementById('stopBtn'),
@@ -46,15 +49,23 @@ class PopupController {
 
   async loadSettings() {
     const settings = await chrome.storage.local.get([
-      'apiEndpoint',
+      'textApiEndpoint',
+      'imageApiEndpoint',
       'maxSwipes'
     ]);
     
-    if (settings.apiEndpoint) {
-      this.elements.apiEndpoint.value = settings.apiEndpoint;
+    if (settings.textApiEndpoint) {
+      this.elements.textApiEndpoint.value = settings.textApiEndpoint;
     } else {
       // Устанавливаем значение по умолчанию
-      this.elements.apiEndpoint.value = 'http://localhost:3000/decide';
+      this.elements.textApiEndpoint.value = 'http://localhost:3000/text-decide';
+    }
+    
+    if (settings.imageApiEndpoint) {
+      this.elements.imageApiEndpoint.value = settings.imageApiEndpoint;
+    } else {
+      // Устанавливаем значение по умолчанию
+      this.elements.imageApiEndpoint.value = 'http://localhost:3000/image-decide';
     }
     
     if (settings.maxSwipes) {
@@ -64,12 +75,28 @@ class PopupController {
 
   async saveSettings() {
     const settings = {
-      apiEndpoint: this.elements.apiEndpoint.value,
+      textApiEndpoint: this.elements.textApiEndpoint.value,
+      imageApiEndpoint: this.elements.imageApiEndpoint.value,
       maxSwipes: parseInt(this.elements.maxSwipes.value)
     };
     
     await chrome.storage.local.set(settings);
     console.log('Settings saved:', settings);
+    
+    // Show save confirmation
+    this.showUrlStatus('textUrlStatus', 'Saved!', true);
+    this.showUrlStatus('imageUrlStatus', 'Saved!', true);
+  }
+  
+  showUrlStatus(elementId, message, success) {
+    const statusEl = this.elements[elementId];
+    statusEl.textContent = message;
+    statusEl.className = success ? 'url-status url-saved' : 'url-status url-error';
+    statusEl.style.display = 'block';
+    
+    setTimeout(() => {
+      statusEl.style.display = 'none';
+    }, 3000);
   }
 
   bindEvents() {
@@ -77,7 +104,8 @@ class PopupController {
     this.elements.stopBtn.onclick = () => this.stopSwiping();
     
     // Автосохранение настроек при изменении
-    this.elements.apiEndpoint.onchange = () => this.saveSettings();
+    this.elements.textApiEndpoint.onchange = () => this.saveSettings();
+    this.elements.imageApiEndpoint.onchange = () => this.saveSettings();
     this.elements.maxSwipes.onchange = () => this.saveSettings();
   }
 
@@ -87,9 +115,9 @@ class PopupController {
       return;
     }
 
-    if (!this.elements.apiEndpoint.value) {
-      alert('Please enter API endpoint first');
-      console.error('No API endpoint configured');
+    if (!this.elements.textApiEndpoint.value || !this.elements.imageApiEndpoint.value) {
+      alert('Please enter both Text and Image API endpoints');
+      console.error('API endpoints not configured');
       return;
     }
 
@@ -97,7 +125,8 @@ class PopupController {
     await this.saveSettings();
 
     const config = {
-      apiEndpoint: this.elements.apiEndpoint.value,
+      textApiEndpoint: this.elements.textApiEndpoint.value,
+      imageApiEndpoint: this.elements.imageApiEndpoint.value,
       maxSwipes: parseInt(this.elements.maxSwipes.value)
     };
 

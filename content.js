@@ -4,7 +4,9 @@ class SimpleTinderSwiper {
     this.isRunning = false;
     this.swipeCount = 0;
     this.config = {
-      apiEndpoint: 'https://your-api.com/decide', // Will be updated via popup
+      apiEndpoint: 'https://your-api.com/decide', // Legacy endpoint
+      textApiEndpoint: 'https://your-api.com/text-decide', // Text analysis endpoint
+      imageApiEndpoint: 'https://your-api.com/image-decide', // Image analysis endpoint
       maxSwipes: 200,
       userId: this.generateUserId()
     };
@@ -129,20 +131,56 @@ class SimpleTinderSwiper {
           verified: profileData.verified
         });
         
-        // STEP 3: Send to API
-        const decision = await this.requestDecision(profileData);
+        // STEP 3: Multi-step decision process
+        // Step 3.1: Send text data first
+        const textDecision = await this.requestTextDecision(profileData);
         
-        if (!decision) {
+        if (!textDecision) {
           console.error('❌ No decision from API. Stopping.');
           this.stop();
           break;
         }
         
-        // STEP 4: Execute swipe
-        await this.executeSwipe(decision);
+        let finalDecision = textDecision; // Initialize here for scope
+        
+        // Check if we should skip based on text alone
+        if (textDecision.action === 'skip' || textDecision.action === 'pass' || textDecision.action === 'left') {
+          console.log('⏭️ Skipping profile based on text analysis');
+          await this.executeSwipe(textDecision);
+        } else {
+          // Step 3.2: Process images one by one
+          console.log(`🖼️ Processing ${profileData.photos.length} images individually...`);
+          
+          for (let i = 0; i < profileData.photos.length; i++) {
+            const imageUrl = profileData.photos[i];
+            console.log(`📸 Checking image ${i + 1}/${profileData.photos.length}`);
+            
+            const imageDecision = await this.requestImageDecision({ 
+              imageUrl: imageUrl,
+              imageIndex: i,
+              totalImages: profileData.photos.length,
+              name: profileData.name 
+            });
+            
+            if (!imageDecision) {
+              console.error('❌ No decision from image API. Using text decision.');
+              break;
+            }
+            
+            // If any image says skip, we skip the entire profile
+            if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
+              console.log(`⏭️ Skipping profile based on image ${i + 1}`);
+              finalDecision = imageDecision;
+              break;
+            }
+          }
+          
+          // STEP 4: Execute final swipe decision
+          await this.executeSwipe(finalDecision);
+        }
         
         // Wait before next profile
-        const delay = decision.nextDelay || 4000;
+        const delay = finalDecision?.nextDelay || textDecision?.nextDelay || 4000;
         console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
         await this.delay(delay);
         
@@ -735,7 +773,6 @@ class SimpleTinderSwiper {
   }
 
   extractSpotifyInfo(container) {
-    console.log('🎵 Extracting Spotify info...');
     
     // Look for track/artist names and Spotify elements
     const spotifyItems = [];
@@ -784,18 +821,28 @@ class SimpleTinderSwiper {
     return Object.keys(info).length > 0 ? info : null;
   }
 
-  async requestDecision(profileData) {
+  async requestTextDecision(profileData) {
     try {
       const requestPayload = {
         userId: this.config.userId,
-        profile: profileData,
+        profile: {
+          name: profileData.name,
+          age: profileData.age,
+          bio: profileData.bio,
+          verified: profileData.verified,
+          photoCount: profileData.photos.length,
+          profileInfo: profileData.profileInfo,
+          timestamp: profileData.timestamp,
+          url: profileData.url
+        },
         swipeCount: this.swipeCount,
         stats: this.stats
       };
-
-      console.log('🌐 Requesting decision from API...');
       
-      const response = await fetch(this.config.apiEndpoint, {
+      console.log('🌐 Requesting text-based decision from API...');
+      
+      const endpoint = this.config.textApiEndpoint || this.config.apiEndpoint;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -805,12 +852,12 @@ class SimpleTinderSwiper {
       });
 
       if (!response.ok) {
-        throw new Error(`API responded with ${response.status}`);
+        throw new Error(`Text API responded with ${response.status}`);
       }
 
       const decision = await response.json();
       
-      console.log('📝 Decision received:', {
+      console.log('📝 Text decision received:', {
         action: decision.action,
         reason: decision.reason,
         confidence: decision.confidence
@@ -819,15 +866,67 @@ class SimpleTinderSwiper {
       return decision;
 
     } catch (error) {
-      console.error('❌ API request failed:', error);
+      console.error('❌ Text API request failed:', error);
       console.log('🛑 Stopping swiper due to API unavailability');
       
-      // Останавливаем свайпер при недоступности API
       this.stop();
       
       return {
         action: 'stop',
-        reason: 'API unavailable - stopping swiper',
+        reason: 'Text API unavailable - stopping swiper',
+        confidence: 1.0,
+        nextDelay: 0
+      };
+    }
+  }
+
+  async requestImageDecision(imageData) {
+    try {
+      const requestPayload = {
+        userId: this.config.userId,
+        imageUrl: imageData.imageUrl,
+        imageIndex: imageData.imageIndex,
+        totalImages: imageData.totalImages,
+        profileName: imageData.name,
+        swipeCount: this.swipeCount,
+        stats: this.stats
+      };
+      
+      console.log('🌐 Requesting image-based decision from API...');
+      
+      const endpoint = this.config.imageApiEndpoint || this.config.apiEndpoint;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'TinderSwiper/1.0'
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Image API responded with ${response.status}`);
+      }
+
+      const decision = await response.json();
+      
+      console.log('📝 Image decision received:', {
+        action: decision.action,
+        reason: decision.reason,
+        confidence: decision.confidence
+      });
+
+      return decision;
+
+    } catch (error) {
+      console.error('❌ Image API request failed:', error);
+      console.log('🛑 Stopping swiper due to API unavailability');
+      
+      this.stop();
+      
+      return {
+        action: 'stop',
+        reason: 'Image API unavailable - stopping swiper',
         confidence: 1.0,
         nextDelay: 0
       };
@@ -846,7 +945,7 @@ class SimpleTinderSwiper {
     if (action === 'like' || action === 'right') {
       await this.swipeRight(decision.reason);
       this.stats.likes++;
-    } else if (action === 'pass' || action === 'left') {
+    } else if (action === 'pass' || action === 'left' || action === 'skip') {
       await this.swipeLeft(decision.reason);
       this.stats.passes++;
     } else {

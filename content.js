@@ -115,79 +115,117 @@ class SimpleTinderSwiper {
           break;
         }
         
-        // STEP 2: Extract all profile data
-        const profileData = await this.extractAllProfileData();
+        // STEP 2: Extract basic data and first image only
+        const basicData = await this.extractBasicProfileData();
         
-        if (!profileData) {
-          console.error('❌ No profile data extracted. Stopping.');
+        if (!basicData) {
+          console.error('❌ No basic profile data extracted. Stopping.');
           this.stop();
           break;
         }
         
-        console.log('\n✅ PROFILE DATA EXTRACTED:', {
-          name: profileData.name,
-          age: profileData.age,
-          photosExtracted: profileData.photos.length,
-          bioLength: profileData.bio.length,
-          verified: profileData.verified
+        console.log('\n📋 BASIC DATA EXTRACTED:', {
+          name: basicData.name,
+          age: basicData.age,
+          firstPhotoFound: basicData.firstPhoto ? 'Yes' : 'No',
+          verified: basicData.verified
         });
         
-        // STEP 3: Multi-step decision process
-        // Step 3.1: Send text data first
-        const textDecision = await this.requestTextDecision(profileData);
+        // STEP 3: Human-like decision process
+        let finalDecision = null;
+        let shouldContinue = true;
         
-        if (!textDecision) {
-          console.error('❌ No decision from API. Stopping.');
-          this.stop();
-          break;
-        }
-        
-        let finalDecision = textDecision; // Initialize here for scope
-        
-        // Check text decision result
-        if (textDecision.action === 'skip' || textDecision.action === 'pass' || textDecision.action === 'left') {
-          console.log('⏭️ Skipping profile based on text analysis');
-          await this.executeSwipe(textDecision);
-        } else if (textDecision.action === 'like' || textDecision.action === 'right') {
-          // Step 3.2: Process all images at once (only for positive text feedback)
-          console.log(`✅ Text analysis positive - processing all ${profileData.photos.length} images at once...`);
+        // Step 3.1: Quick first image check (if available)
+        if (basicData.firstPhoto) {
+          console.log('🖼️ Analyzing first image for quick decision...');
+          const firstImageDecision = await this.requestImageDecision({
+            imageUrls: [basicData.firstPhoto],
+            imageIndex: 0,
+            totalImages: 1,
+            name: basicData.name,
+            skipThreshold: 1
+          });
           
-          if (profileData.photos.length > 0) {
-            const imageDecision = await this.requestImageDecision({ 
-              imageUrls: profileData.photos,
-              totalImages: profileData.photos.length,
-              name: profileData.name,
-              skipThreshold: this.config.skipAfterImages
-            });
-            
-            if (!imageDecision) {
-              console.error('❌ Image API request failed. Stopping swiping completely.');
-              this.stop();
-              return; // Exit the entire swipe loop
-            }
-            
-            if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
-              console.log('🚫 Skipping profile based on image analysis');
-              finalDecision = imageDecision;
-            } else {
-              console.log('💕 Image analysis positive - proceeding with like decision');
-              finalDecision = textDecision;
-            }
-          } else {
-            console.log('⚠️ No images found - proceeding with text decision');
-            finalDecision = textDecision;
+          if (!firstImageDecision) {
+            console.error('❌ First image API request failed. Stopping.');
+            this.stop();
+            break;
           }
           
-          // STEP 4: Execute final swipe decision
+          if (firstImageDecision.action === 'skip' || firstImageDecision.action === 'pass' || firstImageDecision.action === 'left') {
+            console.log('⏭️ Quick PASS based on first image');
+            finalDecision = firstImageDecision;
+            shouldContinue = false;
+          }
+        }
+        
+        // Step 3.2: If first image passed or no image, analyze text while fetching remaining images
+        if (shouldContinue) {
+          // Start fetching all images in parallel with text analysis
+          const allImagesPromise = this.extractAllPhotos();
+          
+          // Extract full profile data including bio
+          const fullProfileData = await this.extractFullProfileData(basicData);
+          
+          console.log('📝 Analyzing text content...');
+          const textDecision = await this.requestTextDecision(fullProfileData);
+          
+          if (!textDecision) {
+            console.error('❌ Text API request failed. Stopping.');
+            this.stop();
+            break;
+          }
+          
+          if (textDecision.action === 'skip' || textDecision.action === 'pass' || textDecision.action === 'left') {
+            console.log('⏭️ PASS based on text analysis');
+            finalDecision = textDecision;
+            shouldContinue = false;
+          }
+          
+          // Step 3.3: If text passed, analyze all images at once
+          if (shouldContinue) {
+            const allPhotos = await allImagesPromise;
+            console.log(`🖼️ Text passed - analyzing all ${allPhotos.length} images at once...`);
+            
+            if (allPhotos.length > 0) {
+              const allImagesDecision = await this.requestImageDecision({
+                imageUrls: allPhotos,
+                totalImages: allPhotos.length,
+                name: fullProfileData.name,
+                skipThreshold: this.config.skipAfterImages
+              });
+              
+              if (!allImagesDecision) {
+                console.error('❌ All images API request failed. Stopping.');
+                this.stop();
+                break;
+              }
+              
+              if (allImagesDecision.action === 'skip' || allImagesDecision.action === 'pass' || allImagesDecision.action === 'left') {
+                console.log('🚫 PASS based on full image analysis');
+                finalDecision = allImagesDecision;
+              } else {
+                console.log('💕 All checks passed - LIKE decision');
+                finalDecision = textDecision; // Use text decision for like
+              }
+            } else {
+              console.log('💕 Text passed, no images - LIKE decision');
+              finalDecision = textDecision;
+            }
+          }
+        }
+        
+        // STEP 4: Execute final swipe decision
+        if (finalDecision) {
           await this.executeSwipe(finalDecision);
         } else {
-          // Unknown text decision - default to text decision without image processing
-          console.log(`⚠️ Unknown text decision "${textDecision.action}" - executing without image analysis`);
-          await this.executeSwipe(textDecision);
+          console.error('❌ No final decision made. Stopping.');
+          this.stop();
+          break;
         }
         
         // Wait before next profile
-        const delay = finalDecision?.nextDelay || textDecision?.nextDelay || 4000;
+        const delay = finalDecision?.nextDelay || 4000;
         console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
         await this.delay(delay);
         
@@ -433,6 +471,73 @@ class SimpleTinderSwiper {
     } catch (error) {
       console.error('❌ Error extracting first photo:', error);
       return [];
+    }
+  }
+
+  async extractBasicProfileData() {
+    // Extract only basic data and first photo for quick analysis
+    const data = {
+      name: 'Unknown',
+      age: null,
+      verified: false,
+      firstPhoto: null
+    };
+    
+    try {
+      // 1. Extract name
+      data.name = this.extractName();
+      
+      // 2. Extract age
+      data.age = this.extractAge();
+      
+      // 3. Extract verification status
+      data.verified = this.extractVerificationStatus();
+      
+      // 4. Extract only first photo
+      const firstPhotos = await this.extractFirstPhotoOnly();
+      if (firstPhotos.length > 0) {
+        data.firstPhoto = firstPhotos[0];
+      }
+      
+      // Validate data quality
+      if (data.name === 'Unknown') {
+        console.error('❌ Basic profile data quality insufficient');
+        return null;
+      }
+      
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Error during basic profile extraction:', error);
+      return null;
+    }
+  }
+
+  async extractFullProfileData(basicData) {
+    // Extract full profile data including bio and all profile info
+    const fullData = {
+      ...basicData,
+      bio: '',
+      photos: [],
+      profileInfo: {},
+      timestamp: Date.now(),
+      url: window.location.href
+    };
+    
+    try {
+      // Extract bio
+      fullData.bio = this.extractBio();
+      
+      // Extract all profile info sections
+      fullData.profileInfo = this.extractAllProfileInfo();
+      
+      // Photos will be extracted separately in parallel
+      
+      return fullData;
+      
+    } catch (error) {
+      console.error('❌ Error during full profile extraction:', error);
+      return fullData; // Return partial data
     }
   }
 

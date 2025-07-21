@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "remote-chrome": {
+      "url": "https://2519ddb5b4a3.ngrok-free.app/mcp",
+      "type": "http"
+    }
+  }
+}

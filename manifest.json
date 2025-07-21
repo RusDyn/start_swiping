@@ -1,22 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Start Swiping",
-  "version": "1.0",
-  "description": "Simple Tinder auto-swiper with external decision service",
+  "name": "Universal Dating Swiper",
+  "version": "2.0",
+  "description": "Universal auto-swiper for Tinder and Bumble with external decision service",
   "permissions": [
     "activeTab",
     "storage"
   ],
   "host_permissions": [
     "https://tinder.com/*",
+    "https://*.bumble.com/*",
     "http://localhost/*",
     "https://*/*",
     "http://*/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://tinder.com/*"],
-      "js": ["content.js"]
+      "matches": ["https://tinder.com/*", "https://*.bumble.com/*"],
+      "js": ["content.js"],
+      "type": "module"
     }
   ],
   "action": {

@@ -17,8 +17,7 @@
   "content_scripts": [
     {
       "matches": ["https://tinder.com/*", "https://*.bumble.com/*"],
-      "js": ["content.js"],
-      "type": "module"
+      "js": ["platform.js", "tinder.js", "bumble.js", "content.js"]
     }
   ],
   "action": {

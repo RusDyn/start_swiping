@@ -1,17 +1,5 @@
 // Bumble-specific functionality - Functional approach
-
-import {
-  universalState,
-  setRunningState,
-  incrementSwipeCount,
-  resetSwipeCount,
-  updateStats,
-  makeApiRequest,
-  delayExecution,
-  triggerKeyEvent,
-  cleanText,
-  isValidUrl
-} from './platform.js';
+// Dependencies loaded from platform.js
 
 // Bumble-specific selectors
 const BUMBLE_SELECTORS = {
@@ -46,14 +34,14 @@ const BUMBLE_SELECTORS = {
 
 // Start swiping on Bumble
 async function startBumbleSwiping(userConfig = {}) {
-  if (universalState.isRunning) {
+  if (window.universalState.isRunning) {
     console.log('Already running');
     return;
   }
 
-  universalState.config = { ...universalState.config, ...userConfig };
-  setRunningState(true);
-  resetSwipeCount();
+  window.universalState.config = { ...window.universalState.config, ...userConfig };
+  window.setRunningState(true);
+  window.resetSwipeCount();
   
   console.log('🚀 Starting Bumble swiper');
   await executeBumbleSwipeLoop();
@@ -61,7 +49,7 @@ async function startBumbleSwiping(userConfig = {}) {
 
 // Stop swiping
 function stopBumbleSwiping() {
-  setRunningState(false);
+  window.setRunningState(false);
   console.log('⏹️ Bumble swiper stopped');
 }
 
@@ -69,9 +57,9 @@ function stopBumbleSwiping() {
 async function executeBumbleSwipeLoop() {
   console.log('====== STARTING BUMBLE SWIPE LOOP ======');
   
-  while (universalState.isRunning && universalState.swipeCount < universalState.config.maxSwipes) {
+  while (window.universalState.isRunning && window.universalState.swipeCount < window.universalState.config.maxSwipes) {
     try {
-      console.log(`\n🔄 BUMBLE SWIPE #${universalState.swipeCount + 1} STARTING...`);
+      console.log(`\n🔄 BUMBLE SWIPE #${window.universalState.swipeCount + 1} STARTING...`);
       
       // STEP 1: Extract basic profile data
       const basicData = await extractBumbleBasicData();
@@ -145,7 +133,7 @@ async function executeBumbleSwipeLoop() {
             imageUrls: fullData.photos,
             totalImages: fullData.photos.length,
             name: fullData.name,
-            skipThreshold: universalState.config.skipAfterImages
+            skipThreshold: window.universalState.config.skipAfterImages
           });
           
           if (!allImagesDecision) {
@@ -179,15 +167,15 @@ async function executeBumbleSwipeLoop() {
       // Wait before next profile
       const delay = finalDecision?.nextDelay || 4000;
       console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
-      await delayExecution(delay);
+      await window.delayExecution(delay);
       
-      incrementSwipeCount();
-      console.log(`✅ Bumble swipe #${universalState.swipeCount} completed!\n`);
+      window.incrementSwipeCount();
+      console.log(`✅ Bumble swipe #${window.universalState.swipeCount} completed!\n`);
 
     } catch (error) {
       console.error('\n❌ CRITICAL ERROR in Bumble swipe loop:', error);
       console.error('Stack trace:', error.stack);
-      updateStats('error');
+      window.updateStats('error');
       console.log('🛑 Stopping due to error.');
       stopBumbleSwiping();
       break;
@@ -213,7 +201,7 @@ async function extractBumbleBasicData() {
     // Extract name
     const nameEl = document.querySelector(BUMBLE_SELECTORS.name);
     if (nameEl) {
-      data.name = cleanText(nameEl.textContent);
+      data.name = window.cleanText(nameEl.textContent);
     }
     
     // Extract age (format: ", 20")
@@ -232,13 +220,13 @@ async function extractBumbleBasicData() {
     // Extract location
     const locationEl = document.querySelector(BUMBLE_SELECTORS.location);
     if (locationEl) {
-      data.location = cleanText(locationEl.textContent);
+      data.location = window.cleanText(locationEl.textContent);
     }
     
     // Extract distance
     const distanceEl = document.querySelector(BUMBLE_SELECTORS.distance);
     if (distanceEl) {
-      data.distance = cleanText(distanceEl.textContent);
+      data.distance = window.cleanText(distanceEl.textContent);
     }
     
     // Extract first photo
@@ -282,7 +270,7 @@ async function extractBumbleFullData(basicData) {
     // Extract badges (lifestyle info)
     const badgeElements = document.querySelectorAll(BUMBLE_SELECTORS.badges);
     badgeElements.forEach(badge => {
-      const badgeText = cleanText(badge.textContent);
+      const badgeText = window.cleanText(badge.textContent);
       if (badgeText && badgeText.length > 0) {
         fullData.badges.push(badgeText);
       }
@@ -346,7 +334,7 @@ function extractBumblePhotoUrl(rawUrl) {
 
 // Validate if URL is a valid Bumble photo
 function isBumblePhotoValid(url) {
-  if (!isValidUrl(url)) return false;
+  if (!window.isValidUrl(url)) return false;
   
   // Check if it's from Bumble CDN
   const bumbleCdnPatterns = [
@@ -361,7 +349,7 @@ function isBumblePhotoValid(url) {
 async function requestBumbleTextDecision(profileData) {
   try {
     const requestPayload = {
-      userId: universalState.config.userId,
+      userId: window.universalState.config.userId,
       platform: 'bumble',
       profile: {
         name: profileData.name,
@@ -374,14 +362,14 @@ async function requestBumbleTextDecision(profileData) {
         timestamp: profileData.timestamp,
         url: profileData.url
       },
-      swipeCount: universalState.swipeCount,
-      stats: universalState.stats
+      swipeCount: window.universalState.swipeCount,
+      stats: window.universalState.stats
     };
     
     console.log('🌐 Requesting Bumble text-based decision from API...');
     
-    const endpoint = universalState.config.textApiEndpoint || universalState.config.apiEndpoint;
-    const decision = await makeApiRequest(endpoint, requestPayload, 180000);
+    const endpoint = window.universalState.config.textApiEndpoint || window.universalState.config.apiEndpoint;
+    const decision = await window.makeApiRequest(endpoint, requestPayload, 180000);
     
     console.log('📝 Bumble text decision received:', {
       action: decision.action,
@@ -407,21 +395,21 @@ async function requestBumbleTextDecision(profileData) {
 async function requestBumbleImageDecision(imageData) {
   try {
     const requestPayload = {
-      userId: universalState.config.userId,
+      userId: window.universalState.config.userId,
       platform: 'bumble',
       imageUrls: imageData.imageUrls,
       imageIndex: imageData.imageIndex,
       totalImages: imageData.totalImages,
       profileName: imageData.name,
       skipThreshold: imageData.skipThreshold,
-      swipeCount: universalState.swipeCount,
-      stats: universalState.stats
+      swipeCount: window.universalState.swipeCount,
+      stats: window.universalState.stats
     };
     
     console.log(`🌐 Requesting Bumble image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
     
-    const endpoint = universalState.config.imageApiEndpoint || universalState.config.apiEndpoint;
-    const decision = await makeApiRequest(endpoint, requestPayload);
+    const endpoint = window.universalState.config.imageApiEndpoint || window.universalState.config.apiEndpoint;
+    const decision = await window.makeApiRequest(endpoint, requestPayload);
     
     console.log('📝 Bumble image decision received:', {
       action: decision.action,
@@ -451,13 +439,13 @@ async function executeBumbleSwipe(decision) {
   
   if (action === 'like' || action === 'right') {
     await bumbleSwipeRight(decision.reason);
-    updateStats('like');
+    window.updateStats('like');
   } else if (action === 'pass' || action === 'left' || action === 'skip') {
     await bumbleSwipeLeft(decision.reason);
-    updateStats('pass');
+    window.updateStats('pass');
   } else {
     console.error(`❌ Unknown Bumble action: "${decision.action}" - Stopping swiper`);
-    updateStats('error');
+    window.updateStats('error');
     stopBumbleSwiping();
     return;
   }
@@ -474,7 +462,7 @@ async function bumbleSwipeRight(reason) {
     console.log('✅ Bumble like button clicked');
   } else {
     console.log('⚠️ Bumble like button not found, using keyboard fallback');
-    triggerKeyEvent('ArrowRight');
+    window.triggerKeyEvent('ArrowRight');
   }
   
   // Handle potential match modals
@@ -492,7 +480,7 @@ async function bumbleSwipeLeft(reason) {
     console.log('✅ Bumble pass button clicked');
   } else {
     console.log('⚠️ Bumble pass button not found, using keyboard fallback');
-    triggerKeyEvent('ArrowLeft');
+    window.triggerKeyEvent('ArrowLeft');
   }
 }
 
@@ -518,18 +506,16 @@ function handleBumbleModals() {
         closeBtn.click();
         console.log('🗙 Closed Bumble modal dialog');
       } else {
-        triggerKeyEvent('Escape');
+        window.triggerKeyEvent('Escape');
       }
     }
   });
 }
 
-// Export Bumble functions
-export {
-  startBumbleSwiping,
-  stopBumbleSwiping,
-  extractBumbleBasicData,
-  extractBumbleFullData,
-  extractBumblePhotos,
-  BUMBLE_SELECTORS
-};
+// Make Bumble functions available globally
+window.startBumbleSwiping = startBumbleSwiping;
+window.stopBumbleSwiping = stopBumbleSwiping;
+window.extractBumbleBasicData = extractBumbleBasicData;
+window.extractBumbleFullData = extractBumbleFullData;
+window.extractBumblePhotos = extractBumblePhotos;
+window.BUMBLE_SELECTORS = BUMBLE_SELECTORS;

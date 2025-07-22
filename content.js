@@ -1,32 +1,15 @@
 // Universal Dating App Swiper - Content Script
-import {
-  PLATFORMS,
-  isPlatformSupported,
-  initializePlatform,
-  updateUniversalConfig,
-  getUniversalStats,
-  getUniversalStatus
-} from './platform.js';
-
-import {
-  startSwiping as startTinderSwiping,
-  stopSwiping as stopTinderSwiping
-} from './tinder.js';
-
-import {
-  startBumbleSwiping,
-  stopBumbleSwiping
-} from './bumble.js';
+// Dependencies loaded from platform.js, tinder.js, bumble.js
 
 console.log('🤖 Universal Dating App Swiper Content Script loaded');
 
 // Platform-specific action handlers
 async function handleStartAction(platform, config) {
   switch (platform) {
-    case PLATFORMS.TINDER:
-      return await startTinderSwiping(config);
-    case PLATFORMS.BUMBLE:
-      return await startBumbleSwiping(config);
+    case window.PLATFORMS.TINDER:
+      return await window.startTinderSwiping(config);
+    case window.PLATFORMS.BUMBLE:
+      return await window.startBumbleSwiping(config);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -34,11 +17,11 @@ async function handleStartAction(platform, config) {
 
 function handleStopAction(platform) {
   switch (platform) {
-    case PLATFORMS.TINDER:
-      stopTinderSwiping();
+    case window.PLATFORMS.TINDER:
+      window.stopTinderSwiping();
       break;
-    case PLATFORMS.BUMBLE:
-      stopBumbleSwiping();
+    case window.PLATFORMS.BUMBLE:
+      window.stopBumbleSwiping();
       break;
     default:
       console.error(`Unsupported platform: ${platform}`);
@@ -47,12 +30,12 @@ function handleStopAction(platform) {
 
 // Initialize the swiper when the page is ready
 function initializeSwiper() {
-  if (!isPlatformSupported()) {
+  if (!window.isPlatformSupported()) {
     console.log('⚠️ Platform not supported');
     return;
   }
 
-  const platform = initializePlatform();
+  const platform = window.initializePlatform();
   
   // Platform-specific initialization
   // No platform-specific initialization needed
@@ -76,15 +59,15 @@ function initializeSwiper() {
           break;
           
         case 'getStats':
-          sendResponse(getUniversalStats());
+          sendResponse(window.getUniversalStats());
           break;
           
         case 'getStatus':
-          sendResponse(getUniversalStatus());
+          sendResponse(window.getUniversalStatus());
           break;
           
         case 'updateConfig':
-          updateUniversalConfig(request.config);
+          window.updateUniversalConfig(request.config);
           sendResponse({ success: true });
           break;
           

@@ -1,42 +1,33 @@
 // Tinder-specific functionality - Functional approach
-
-import {
-  universalState,
-  setRunningState,
-  incrementSwipeCount,
-  resetSwipeCount,
-  updateStats,
-  delayExecution,
-  triggerKeyEvent
-} from './platform.js';
+// Dependencies loaded from platform.js
 
 
 // Main swiper functions
 async function startSwiping(userConfig = {}) {
-  if (universalState.isRunning) {
+  if (window.window.universalState.isRunning) {
     console.log('Already running');
     return;
   }
 
-  universalState.config = { ...universalState.config, ...userConfig };
-  setRunningState(true);
-  resetSwipeCount();
+  window.window.universalState.config = { ...window.window.universalState.config, ...userConfig };
+  window.setRunningState(true);
+  window.resetSwipeCount();
   
   console.log('🚀 Starting Tinder swiper');
   await executeSwipeLoop();
 }
 
 function stopSwiping() {
-  setRunningState(false);
+  window.setRunningState(false);
   console.log('⏹️ Tinder swiper stopped');
 }
 
 async function executeSwipeLoop() {
   console.log('====== STARTING TINDER SWIPE LOOP ======');
   
-  while (universalState.isRunning && universalState.swipeCount < universalState.config.maxSwipes) {
+  while (window.universalState.isRunning && window.universalState.swipeCount < window.universalState.config.maxSwipes) {
     try {
-      console.log(`\n🔄 SWIPE #${universalState.swipeCount + 1} STARTING...`);
+      console.log(`\n🔄 SWIPE #${window.universalState.swipeCount + 1} STARTING...`);
       
       // STEP 1: Click "Open Profile" button and wait
       const openSuccess = await clickOpenProfileAndWait();
@@ -122,7 +113,7 @@ async function executeSwipeLoop() {
               imageUrls: allPhotos,
               totalImages: allPhotos.length,
               name: fullProfileData.name,
-              skipThreshold: universalState.config.skipAfterImages
+              skipThreshold: window.universalState.config.skipAfterImages
             });
             
             if (!allImagesDecision) {
@@ -157,15 +148,15 @@ async function executeSwipeLoop() {
       // Wait before next profile
       const delay = finalDecision?.nextDelay || 4000;
       console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
-      await delayExecution(delay);
+      await window.delayExecution(delay);
       
-      incrementSwipeCount();
-      console.log(`✅ Swipe #${universalState.swipeCount} completed!\n`);
+      window.incrementSwipeCount();
+      console.log(`✅ Swipe #${window.universalState.swipeCount} completed!\n`);
 
     } catch (error) {
       console.error('\n❌ CRITICAL ERROR in swipe loop:', error);
       console.error('Stack trace:', error.stack);
-      updateStats('error');
+      window.updateStats('error');
       console.log('🛑 Stopping due to error.');
       stopSwiping();
       break;
@@ -199,7 +190,7 @@ async function clickOpenProfileAndWait() {
     showButton.click();
     
     console.log('⏱️ Waiting 3 seconds for profile to load...');
-    await delayExecution(3000);
+    await window.delayExecution(3000);
     
     return true;
   } catch (error) {
@@ -574,7 +565,7 @@ async function loadAllPhotosFromCarousel(totalPhotos) {
       await navigateToNextPhoto(photoContainer, i);
     }
     
-    await delayExecution(800);
+    await window.delayExecution(800);
     
     const activePhoto = extractCurrentActivePhoto();
     if (activePhoto && isValidProfilePhoto(activePhoto) && !processedUrls.has(activePhoto)) {
@@ -639,7 +630,7 @@ function extractCurrentActivePhoto() {
 async function requestTextDecision(profileData) {
   try {
     const requestPayload = {
-      userId: universalState.config.userId,
+      userId: window.universalState.config.userId,
       profile: {
         name: profileData.name,
         age: profileData.age,
@@ -650,13 +641,13 @@ async function requestTextDecision(profileData) {
         timestamp: profileData.timestamp,
         url: profileData.url
       },
-      swipeCount: universalState.swipeCount,
-      stats: universalState.stats
+      swipeCount: window.universalState.swipeCount,
+      stats: window.universalState.stats
     };
     
     console.log('🌐 Requesting text-based decision from API...');
     
-    const endpoint = universalState.config.textApiEndpoint || universalState.config.apiEndpoint;
+    const endpoint = window.universalState.config.textApiEndpoint || window.universalState.config.apiEndpoint;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
     
@@ -704,19 +695,19 @@ async function requestTextDecision(profileData) {
 async function requestImageDecision(imageData) {
   try {
     const requestPayload = {
-      userId: universalState.config.userId,
+      userId: window.universalState.config.userId,
       imageUrls: imageData.imageUrls || [imageData.imageUrl],
       imageIndex: imageData.imageIndex,
       totalImages: imageData.totalImages,
       profileName: imageData.name,
       skipThreshold: imageData.skipThreshold,
-      swipeCount: universalState.swipeCount,
-      stats: universalState.stats
+      swipeCount: window.universalState.swipeCount,
+      stats: window.universalState.stats
     };
     
     console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
     
-    const endpoint = universalState.config.imageApiEndpoint || universalState.config.apiEndpoint;
+    const endpoint = window.universalState.config.imageApiEndpoint || window.universalState.config.apiEndpoint;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     
@@ -768,13 +759,13 @@ async function executeSwipe(decision) {
   
   if (action === 'like' || action === 'right') {
     await swipeRight(decision.reason);
-    updateStats('like');
+    window.updateStats('like');
   } else if (action === 'pass' || action === 'left' || action === 'skip') {
     await swipeLeft(decision.reason);
-    updateStats('pass');
+    window.updateStats('pass');
   } else {
     console.error(`❌ Unknown action: "${decision.action}" - Stopping swiper`);
-    updateStats('error');
+    window.updateStats('error');
     stopSwiping();
     return;
   }
@@ -817,7 +808,7 @@ async function swipeRight(reason) {
     console.log('✅ Like button clicked');
   } else {
     console.log('⚠️ Like button not found, using keyboard fallback');
-    triggerKeyEvent('ArrowRight');
+    window.triggerKeyEvent('ArrowRight');
   }
   
   setTimeout(() => handleModalDialogs(), 1000);
@@ -859,7 +850,7 @@ async function swipeLeft(reason) {
     console.log('✅ Pass button clicked');
   } else {
     console.log('⚠️ Pass button not found, using keyboard fallback');
-    triggerKeyEvent('ArrowLeft');
+    window.triggerKeyEvent('ArrowLeft');
   }
 }
 
@@ -1061,8 +1052,6 @@ function delayExecution(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Export functions using ES6 modules
-export {
-  startSwiping,
-  stopSwiping
-};
+// Make functions available globally
+window.startTinderSwiping = startSwiping;
+window.stopTinderSwiping = stopSwiping;

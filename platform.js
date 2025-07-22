@@ -207,25 +207,23 @@ async function makeApiRequest(endpoint, payload, timeout = 45000) {
   }
 }
 
-// Export everything
-export {
-  PLATFORMS,
-  detectPlatform,
-  getPlatformConfig,
-  isPlatformSupported,
-  initializePlatform,
-  updateUniversalConfig,
-  getUniversalStats,
-  getUniversalStatus,
-  setRunningState,
-  incrementSwipeCount,
-  resetSwipeCount,
-  updateStats,
-  makeApiRequest,
-  delayExecution,
-  generateUserId,
-  triggerKeyEvent,
-  cleanText,
-  isValidUrl,
-  universalState
-};
+// Make everything available globally
+window.PLATFORMS = PLATFORMS;
+window.detectPlatform = detectPlatform;
+window.getPlatformConfig = getPlatformConfig;
+window.isPlatformSupported = isPlatformSupported;
+window.initializePlatform = initializePlatform;
+window.updateUniversalConfig = updateUniversalConfig;
+window.getUniversalStats = getUniversalStats;
+window.getUniversalStatus = getUniversalStatus;
+window.setRunningState = setRunningState;
+window.incrementSwipeCount = incrementSwipeCount;
+window.resetSwipeCount = resetSwipeCount;
+window.updateStats = updateStats;
+window.makeApiRequest = makeApiRequest;
+window.delayExecution = delayExecution;
+window.generateUserId = generateUserId;
+window.triggerKeyEvent = triggerKeyEvent;
+window.cleanText = cleanText;
+window.isValidUrl = isValidUrl;
+window.universalState = universalState;

@@ -1,6 +1,12 @@
 // Bumble-specific functionality - Functional approach
 // Dependencies loaded from platform.js
 
+// IMPORTANT: Bumble has anti-automation measures that check event.isTrusted
+// For this script to work properly, you need to:
+// 1. Override Bumble's vendor.js file using Chrome DevTools (see BUMBLE_DEVTOOLS_OVERRIDE.md)
+// 2. Search for "e.isTrusted" and replace with "true" or remove the check
+// 3. Keep DevTools open while running the automation
+
 // Bumble-specific selectors
 const BUMBLE_SELECTORS = {
   // Profile information
@@ -551,9 +557,21 @@ async function bumbleSwipeRight(reason) {
   
   if (likeBtn) {
     try {
-      console.log('🎯 Clicking like button directly...');
+      console.log('🎯 Clicking like button with multiple methods...');
+      
+      // Method 1: Direct click
       likeBtn.click();
-      console.log('✅ Like button clicked');
+      
+      // Method 2: Mouse event (immediate fallback)  
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      });
+      likeBtn.dispatchEvent(clickEvent);
+      
+      console.log('✅ Like button clicked with multiple methods');
       
       // Wait for animation and profile change
       await window.delayExecution(2000);
@@ -598,9 +616,21 @@ async function bumbleSwipeLeft(reason) {
   
   if (passBtn) {
     try {
-      console.log('🎯 Clicking pass button directly...');
+      console.log('🎯 Clicking pass button with multiple methods...');
+      
+      // Method 1: Direct click
       passBtn.click();
-      console.log('✅ Pass button clicked');
+      
+      // Method 2: Mouse event (immediate fallback)
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      });
+      passBtn.dispatchEvent(clickEvent);
+      
+      console.log('✅ Pass button clicked with multiple methods');
       
       // Wait for animation and profile change
       await window.delayExecution(2000);

@@ -9,7 +9,6 @@ import {
 } from './platform.js';
 
 import {
-  initializeUserId as initializeTinderUserId,
   startSwiping as startTinderSwiping,
   stopSwiping as stopTinderSwiping
 } from './tinder.js';
@@ -56,9 +55,7 @@ function initializeSwiper() {
   const platform = initializePlatform();
   
   // Platform-specific initialization
-  if (platform === PLATFORMS.TINDER) {
-    initializeTinderUserId();
-  }
+  // No platform-specific initialization needed
   
   // Set up message listener for popup communication
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

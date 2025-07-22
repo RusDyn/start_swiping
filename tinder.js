@@ -10,17 +10,6 @@ import {
   triggerKeyEvent
 } from './platform.js';
 
-// Initialize user ID for Tinder (legacy compatibility)
-function initializeUserId() {
-  let userId = localStorage.getItem('tinderSwiper_userId');
-  if (!userId) {
-    userId = 'user_' + Math.random().toString(36).substring(2, 11);
-    localStorage.setItem('tinderSwiper_userId', userId);
-    // Also set it in universal state
-    universalState.config.userId = userId;
-  }
-  return userId;
-}
 
 // Main swiper functions
 async function startSwiping(userConfig = {}) {
@@ -1074,11 +1063,6 @@ function delayExecution(ms) {
 
 // Export functions using ES6 modules
 export {
-  initializeUserId,
-  updateConfig,
-  getConfig,
-  getStats,
-  getStatus,
   startSwiping,
   stopSwiping
 };

@@ -629,42 +629,51 @@ async function bumbleSwipeLeft(reason) {
     try {
       console.log('🎯 Found pass button, attempting click...');
       
-      // Method 1: Focus + Enter key (best for accessibility elements)
-      passBtn.focus();
+      // Ensure button is visible and ready
+      passBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
       await window.delayExecution(100);
       
-      const enterEvent = new KeyboardEvent('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-        cancelable: true
-      });
+      // Method 1: Focus and simulated interaction
+      passBtn.focus();
+      await window.delayExecution(50);
       
-      const enterResult = passBtn.dispatchEvent(enterEvent);
-      console.log(`✅ Enter key dispatched on pass button (result: ${enterResult})`);
+      // Method 2: Direct click (most reliable for modern web apps)
+      const clickResult = passBtn.click();
+      console.log(`✅ Direct click dispatched on pass button (result: ${clickResult})`);
+      await window.delayExecution(100);
       
-      // Also trigger Space as fallback
-      const spaceEvent = new KeyboardEvent('keydown', {
-        key: ' ',
-        code: 'Space',
-        keyCode: 32,
-        which: 32,
-        bubbles: true,
-        cancelable: true
-      });
+      // Method 3: Mouse events with proper coordinates
+      const rect = passBtn.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
       
-      setTimeout(() => {
-        const spaceResult = passBtn.dispatchEvent(spaceEvent);
-        console.log(`✅ Space key dispatched on pass button (result: ${spaceResult})`);
-      }, 100);
+      // Create more realistic mouse event sequence
+      const events = [
+        new MouseEvent('mouseover', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY }),
+        new MouseEvent('mousedown', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 }),
+        new MouseEvent('mouseup', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 }),
+        new MouseEvent('click', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 })
+      ];
+      
+      for (const event of events) {
+        const result = passBtn.dispatchEvent(event);
+        console.log(`✅ ${event.type} event dispatched (result: ${result})`);
+        await window.delayExecution(10);
+      }
+      
+      // Method 4: Try triggering on parent container if direct click fails
+      const parentAction = passBtn.closest('.encounters-controls__action');
+      if (parentAction && parentAction !== passBtn) {
+        console.log('🎯 Also trying parent container click...');
+        parentAction.click();
+        await window.delayExecution(50);
+      }
       
       // Wait for animation and profile change
       await window.delayExecution(2000);
       
     } catch (error) {
-      console.error('Error with keyboard events on pass button:', error);
+      console.error('Error with click events on pass button:', error);
       console.log('⚠️ Falling back to arrow key method');
       window.triggerKeyEvent('ArrowLeft');
     }

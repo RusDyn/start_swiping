@@ -6,6 +6,7 @@ const BUMBLE_SELECTORS = {
   // Profile information
   name: '.encounters-story-profile__name',
   age: '.encounters-story-profile__age',
+  occupation: '.encounters-story-profile__occupation',
   verification: '.encounters-story-profile__verification-badge',
   location: '.location-widget__town',
   distance: '.location-widget__distance',
@@ -16,6 +17,9 @@ const BUMBLE_SELECTORS = {
   
   // About section
   aboutSection: '.encounters-story-section--about',
+  aboutText: '.encounters-story-about__text',
+  questionSections: '.encounters-story-section--question',
+  questionTexts: '.encounters-story-section--question .encounters-story-about__text',
   badges: '.encounters-story-about__badge .pill__title',
   
   // Action buttons
@@ -73,6 +77,7 @@ async function executeBumbleSwipeLoop() {
       console.log('\n📋 BASIC DATA EXTRACTED:', {
         name: basicData.name,
         age: basicData.age,
+        occupation: basicData.occupation,
         firstPhotoFound: basicData.firstPhoto ? 'Yes' : 'No',
         verified: basicData.verified,
         location: basicData.location
@@ -191,6 +196,7 @@ async function extractBumbleBasicData() {
   const data = {
     name: 'Unknown',
     age: null,
+    occupation: '',
     verified: false,
     location: '',
     distance: '',
@@ -211,6 +217,12 @@ async function extractBumbleBasicData() {
       if (ageMatch) {
         data.age = parseInt(ageMatch[1]);
       }
+    }
+    
+    // Extract occupation
+    const occupationEl = document.querySelector(BUMBLE_SELECTORS.occupation);
+    if (occupationEl) {
+      data.occupation = window.cleanText(occupationEl.textContent);
     }
     
     // Check verification
@@ -267,12 +279,74 @@ async function extractBumbleFullData(basicData) {
     // Extract all photos
     fullData.photos = await extractBumblePhotos();
     
-    // Extract badges (lifestyle info)
-    const badgeElements = document.querySelectorAll(BUMBLE_SELECTORS.badges);
-    badgeElements.forEach(badge => {
-      const badgeText = window.cleanText(badge.textContent);
-      if (badgeText && badgeText.length > 0) {
-        fullData.badges.push(badgeText);
+    // Extract main about text
+    const aboutTextElements = document.querySelectorAll(BUMBLE_SELECTORS.aboutText);
+    const allAboutTexts = [];
+    aboutTextElements.forEach(textEl => {
+      const text = window.cleanText(textEl.textContent);
+      if (text && text.length > 0) {
+        allAboutTexts.push(text);
+      }
+    });
+    
+    // Extract question/answer texts
+    const questionElements = document.querySelectorAll(BUMBLE_SELECTORS.questionSections);
+    const questionTexts = [];
+    questionElements.forEach(section => {
+      const questionTitle = section.querySelector('.encounters-story-section__heading-title');
+      const questionAnswer = section.querySelector(BUMBLE_SELECTORS.aboutText);
+      
+      if (questionTitle && questionAnswer) {
+        const title = window.cleanText(questionTitle.textContent);
+        const answer = window.cleanText(questionAnswer.textContent);
+        if (title && answer) {
+          questionTexts.push(`${title}: ${answer}`);
+        }
+      }
+    });
+    
+    // Combine all text content
+    const allTexts = [...allAboutTexts, ...questionTexts];
+    fullData.about = allTexts.join('\n\n');
+    
+    console.log(`📝 Extracted ${allAboutTexts.length} about texts and ${questionTexts.length} question texts:`);
+    console.log('About texts:', allAboutTexts);
+    console.log('Question texts:', questionTexts);
+    console.log('Combined about text:', fullData.about);
+    console.log(`🏷️ Extracted ${fullData.badges.length} lifestyle badges:`, fullData.badges);
+    
+    // Extract badges with improved category detection
+    const badgeContainers = document.querySelectorAll('.encounters-story-about__badge');
+    badgeContainers.forEach(container => {
+      const pill = container.querySelector('.pill');
+      if (pill) {
+        const img = pill.querySelector('.pill__image');
+        const title = pill.querySelector('.pill__title');
+        
+        if (img && title) {
+          const imgSrc = img.getAttribute('src') || '';
+          const titleText = window.cleanText(title.textContent);
+          
+          // Extract category from image filename
+          let category = null;
+          if (imgSrc.includes('height')) category = 'Height';
+          else if (imgSrc.includes('exercise')) category = 'Exercise';
+          else if (imgSrc.includes('education')) category = 'Education';
+          else if (imgSrc.includes('drinking')) category = 'Drinking';
+          else if (imgSrc.includes('smoking')) category = 'Smoking';
+          else if (imgSrc.includes('gender')) category = 'Gender';
+          else if (imgSrc.includes('intentions')) category = 'Looking for';
+          else if (imgSrc.includes('familyPlans')) category = 'Family plans';
+          else if (imgSrc.includes('starSign')) category = 'Star sign';
+          else if (imgSrc.includes('Politics')) category = 'Politics';
+          else if (imgSrc.includes('religion')) category = 'Religion';
+          
+          // Format as "Category: Value" or just "Value" if category unknown
+          const badgeText = category ? `${category}: ${titleText}` : titleText;
+          if (badgeText && badgeText.length > 0) {
+            fullData.badges.push(badgeText);
+          }
+        }
       }
     });
     
@@ -354,9 +428,11 @@ async function requestBumbleTextDecision(profileData) {
       profile: {
         name: profileData.name,
         age: profileData.age,
+        occupation: profileData.occupation,
         verified: profileData.verified,
         location: profileData.location,
         distance: profileData.distance,
+        about: profileData.about,
         badges: profileData.badges,
         photoCount: profileData.photos.length,
         timestamp: profileData.timestamp,
@@ -455,31 +531,145 @@ async function executeBumbleSwipe(decision) {
 async function bumbleSwipeRight(reason) {
   console.log(`❤️ BUMBLE LIKE: ${reason}`);
   
-  const likeBtn = document.querySelector(BUMBLE_SELECTORS.likeButton);
+  // Try multiple selectors for robustness - including exact working selectors
+  const likeSelectors = [
+    BUMBLE_SELECTORS.likeButton, // Primary selector
+    '[aria-label="Like"]', // Aria label backup
+    '.encounters-action--like', // Class backup
+    'div.encounters-action.encounters-action--like', // More specific class
+    '[class*="encounters-action"][aria-label="Like"]' // Combined backup
+  ];
+  
+  let likeBtn = null;
+  
+  for (const selector of likeSelectors) {
+    likeBtn = document.querySelector(selector);
+    if (likeBtn && likeBtn.offsetParent !== null) { // Check visibility
+      console.log(`✅ Like button found with selector: ${selector}`);
+      break;
+    }
+  }
   
   if (likeBtn) {
-    likeBtn.click();
-    console.log('✅ Bumble like button clicked');
+    try {
+      console.log('🎯 Found like button, attempting click...');
+      
+      // Method 1: Focus + Enter key (best for accessibility elements)
+      likeBtn.focus();
+      await window.delayExecution(100);
+      
+      const enterEvent = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      const enterResult = likeBtn.dispatchEvent(enterEvent);
+      console.log(`✅ Enter key dispatched on like button (result: ${enterResult})`);
+      
+      // Also trigger Space as fallback
+      const spaceEvent = new KeyboardEvent('keydown', {
+        key: ' ',
+        code: 'Space', 
+        keyCode: 32,
+        which: 32,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      setTimeout(() => {
+        const spaceResult = likeBtn.dispatchEvent(spaceEvent);
+        console.log(`✅ Space key dispatched on like button (result: ${spaceResult})`);
+      }, 100);
+      
+      // Wait for animation and profile change
+      await window.delayExecution(2000);
+      
+    } catch (error) {
+      console.error('Error with keyboard events on like button:', error);
+      console.log('⚠️ Falling back to arrow key method');
+      window.triggerKeyEvent('ArrowRight');
+    }
   } else {
-    console.log('⚠️ Bumble like button not found, using keyboard fallback');
+    console.log('⚠️ Bumble like button not found with any selector, using keyboard fallback');
     window.triggerKeyEvent('ArrowRight');
   }
   
-  // Handle potential match modals
-  setTimeout(() => handleBumbleModals(), 1000);
+  // Handle potential match modals with longer delay
+  setTimeout(() => handleBumbleModals(), 2000);
 }
 
 // Swipe left (pass) on Bumble
 async function bumbleSwipeLeft(reason) {
   console.log(`👎 BUMBLE PASS: ${reason}`);
   
-  const passBtn = document.querySelector(BUMBLE_SELECTORS.passButton);
+  // Try multiple selectors for robustness - including exact working selectors
+  const passSelectors = [
+    BUMBLE_SELECTORS.passButton, // Primary selector
+    '[aria-label="Pass"]', // Aria label backup
+    '.encounters-action--dislike', // Class backup
+    'div.encounters-action.encounters-action--dislike', // More specific class
+    '[class*="encounters-action"][aria-label="Pass"]' // Combined backup
+  ];
+  
+  let passBtn = null;
+  
+  for (const selector of passSelectors) {
+    passBtn = document.querySelector(selector);
+    if (passBtn && passBtn.offsetParent !== null) { // Check visibility
+      console.log(`✅ Pass button found with selector: ${selector}`);
+      break;
+    }
+  }
   
   if (passBtn) {
-    passBtn.click();
-    console.log('✅ Bumble pass button clicked');
+    try {
+      console.log('🎯 Found pass button, attempting click...');
+      
+      // Method 1: Focus + Enter key (best for accessibility elements)
+      passBtn.focus();
+      await window.delayExecution(100);
+      
+      const enterEvent = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      const enterResult = passBtn.dispatchEvent(enterEvent);
+      console.log(`✅ Enter key dispatched on pass button (result: ${enterResult})`);
+      
+      // Also trigger Space as fallback
+      const spaceEvent = new KeyboardEvent('keydown', {
+        key: ' ',
+        code: 'Space',
+        keyCode: 32,
+        which: 32,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      setTimeout(() => {
+        const spaceResult = passBtn.dispatchEvent(spaceEvent);
+        console.log(`✅ Space key dispatched on pass button (result: ${spaceResult})`);
+      }, 100);
+      
+      // Wait for animation and profile change
+      await window.delayExecution(2000);
+      
+    } catch (error) {
+      console.error('Error with keyboard events on pass button:', error);
+      console.log('⚠️ Falling back to arrow key method');
+      window.triggerKeyEvent('ArrowLeft');
+    }
   } else {
-    console.log('⚠️ Bumble pass button not found, using keyboard fallback');
+    console.log('⚠️ Bumble pass button not found with any selector, using keyboard fallback');
     window.triggerKeyEvent('ArrowLeft');
   }
 }

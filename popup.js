@@ -118,8 +118,8 @@ class PopupController {
   }
 
   async startSwiping() {
-    if (!this.currentTab.url.includes('tinder.com')) {
-      alert('Please open Tinder.com first');
+    if (!this.currentTab.url.includes('tinder.com') && !this.currentTab.url.includes('bumble.com')) {
+      alert('Please open Tinder.com or Bumble.com first');
       return;
     }
 

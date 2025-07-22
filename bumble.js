@@ -533,11 +533,10 @@ async function bumbleSwipeRight(reason) {
   
   // Try multiple selectors for robustness - including exact working selectors
   const likeSelectors = [
-    BUMBLE_SELECTORS.likeButton, // Primary selector
-    '[aria-label="Like"]', // Aria label backup
+    '[aria-label="Like"]', // Primary working selector from GitHub solutions
+    BUMBLE_SELECTORS.likeButton, // Secondary selector
     '.encounters-action--like', // Class backup
-    'div.encounters-action.encounters-action--like', // More specific class
-    '[class*="encounters-action"][aria-label="Like"]' // Combined backup
+    'div.encounters-action.encounters-action--like' // More specific class
   ];
   
   let likeBtn = null;
@@ -552,50 +551,23 @@ async function bumbleSwipeRight(reason) {
   
   if (likeBtn) {
     try {
-      console.log('🎯 Found like button, attempting click...');
-      
-      // Method 1: Focus + Enter key (best for accessibility elements)
-      likeBtn.focus();
-      await window.delayExecution(100);
-      
-      const enterEvent = new KeyboardEvent('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-        cancelable: true
-      });
-      
-      const enterResult = likeBtn.dispatchEvent(enterEvent);
-      console.log(`✅ Enter key dispatched on like button (result: ${enterResult})`);
-      
-      // Also trigger Space as fallback
-      const spaceEvent = new KeyboardEvent('keydown', {
-        key: ' ',
-        code: 'Space', 
-        keyCode: 32,
-        which: 32,
-        bubbles: true,
-        cancelable: true
-      });
-      
-      setTimeout(() => {
-        const spaceResult = likeBtn.dispatchEvent(spaceEvent);
-        console.log(`✅ Space key dispatched on like button (result: ${spaceResult})`);
-      }, 100);
+      console.log('🎯 Clicking like button directly...');
+      likeBtn.click();
+      console.log('✅ Like button clicked');
       
       // Wait for animation and profile change
       await window.delayExecution(2000);
       
     } catch (error) {
-      console.error('Error with keyboard events on like button:', error);
+      console.error('❌ Error clicking like button:', error);
       console.log('⚠️ Falling back to arrow key method');
       window.triggerKeyEvent('ArrowRight');
+      await window.delayExecution(2000);
     }
   } else {
-    console.log('⚠️ Bumble like button not found with any selector, using keyboard fallback');
+    console.log('⚠️ Like button not found with any selector, using keyboard fallback');
     window.triggerKeyEvent('ArrowRight');
+    await window.delayExecution(2000);
   }
   
   // Handle potential match modals with longer delay
@@ -608,11 +580,10 @@ async function bumbleSwipeLeft(reason) {
   
   // Try multiple selectors for robustness - including exact working selectors
   const passSelectors = [
-    BUMBLE_SELECTORS.passButton, // Primary selector
-    '[aria-label="Pass"]', // Aria label backup
+    '[aria-label="Pass"]', // Primary working selector from GitHub solutions
+    BUMBLE_SELECTORS.passButton, // Secondary selector
     '.encounters-action--dislike', // Class backup
-    'div.encounters-action.encounters-action--dislike', // More specific class
-    '[class*="encounters-action"][aria-label="Pass"]' // Combined backup
+    'div.encounters-action.encounters-action--dislike' // More specific class
   ];
   
   let passBtn = null;
@@ -627,59 +598,23 @@ async function bumbleSwipeLeft(reason) {
   
   if (passBtn) {
     try {
-      console.log('🎯 Found pass button, attempting click...');
-      
-      // Ensure button is visible and ready
-      passBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-      await window.delayExecution(100);
-      
-      // Method 1: Focus and simulated interaction
-      passBtn.focus();
-      await window.delayExecution(50);
-      
-      // Method 2: Direct click (most reliable for modern web apps)
-      const clickResult = passBtn.click();
-      console.log(`✅ Direct click dispatched on pass button (result: ${clickResult})`);
-      await window.delayExecution(100);
-      
-      // Method 3: Mouse events with proper coordinates
-      const rect = passBtn.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      
-      // Create more realistic mouse event sequence
-      const events = [
-        new MouseEvent('mouseover', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY }),
-        new MouseEvent('mousedown', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 }),
-        new MouseEvent('mouseup', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 }),
-        new MouseEvent('click', { view: window, bubbles: true, cancelable: true, clientX: centerX, clientY: centerY, button: 0 })
-      ];
-      
-      for (const event of events) {
-        const result = passBtn.dispatchEvent(event);
-        console.log(`✅ ${event.type} event dispatched (result: ${result})`);
-        await window.delayExecution(10);
-      }
-      
-      // Method 4: Try triggering on parent container if direct click fails
-      const parentAction = passBtn.closest('.encounters-controls__action');
-      if (parentAction && parentAction !== passBtn) {
-        console.log('🎯 Also trying parent container click...');
-        parentAction.click();
-        await window.delayExecution(50);
-      }
+      console.log('🎯 Clicking pass button directly...');
+      passBtn.click();
+      console.log('✅ Pass button clicked');
       
       // Wait for animation and profile change
       await window.delayExecution(2000);
       
     } catch (error) {
-      console.error('Error with click events on pass button:', error);
+      console.error('❌ Error clicking pass button:', error);
       console.log('⚠️ Falling back to arrow key method');
       window.triggerKeyEvent('ArrowLeft');
+      await window.delayExecution(2000);
     }
   } else {
-    console.log('⚠️ Bumble pass button not found with any selector, using keyboard fallback');
+    console.log('⚠️ Pass button not found with any selector, using keyboard fallback');
     window.triggerKeyEvent('ArrowLeft');
+    await window.delayExecution(2000);
   }
 }
 

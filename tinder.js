@@ -86,65 +86,76 @@ async function executeSwipeLoop() {
         verified: basicData.verified
       });
       
-      // STEP 3: Sequential decision-making - each step can result in immediate swipe
+      // STEP 3: True sequential decision-making - each step can result in immediate swipe
       const decisionHistory = [];
       
       // Step 3.1: First image decision
-      if (basicData.firstPhoto) {
-        console.log('🖼️ Step 1: Analyzing first image...');
-        
-        // Get total photos count for context
-        const allPhotos = await extractAllPhotos();
-        const totalPhotosCount = allPhotos.length || 1;
-        
-        const firstImageDecision = await requestImageDecision({
-          imageUrls: [basicData.firstPhoto],
-          imageIndex: 0,
-          totalImages: totalPhotosCount,
-          name: basicData.name,
-          skipThreshold: 1,
-          previousResults: []
+      console.log('🖼️ Step 1: Making FIRST IMAGE decision...');
+      if (!basicData.firstPhoto) {
+        console.error('❌ No first photo available - skipping profile');
+        await executeSwipe({
+          action: 'skip',
+          reason: 'No first photo available',
+          confidence: 1.0
         });
         
-        if (!firstImageDecision) {
-          console.error('❌ First image API request failed. Skipping profile.');
-          await executeSwipe({
-            action: 'skip',
-            reason: 'API request failed for first image analysis',
-            confidence: 1.0
-          });
-          
-          const delay = 4000;
-          console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
-          await window.delayExecution(delay);
-          window.incrementSwipeCount();
-          continue;
-        }
-        
-        decisionHistory.push({
-          step: 'first_image',
-          decision: firstImageDecision.action,
-          reason: firstImageDecision.reason,
-          confidence: firstImageDecision.confidence
-        });
-        
-        // If first image says skip/pass, swipe immediately
-        if (firstImageDecision.action === 'skip' || firstImageDecision.action === 'pass' || firstImageDecision.action === 'left') {
-          console.log('⏭️ First image decision: PASS - swiping left immediately');
-          await executeSwipe(firstImageDecision);
-          
-          const delay = firstImageDecision.nextDelay || 4000;
-          console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
-          await window.delayExecution(delay);
-          window.incrementSwipeCount();
-          continue;
-        }
-        
-        console.log('✅ First image passed - proceeding to bio analysis');
+        const delay = 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
       }
       
+      // Get total photos count for context (but don't extract all yet)
+      const totalPhotosCount = await getTotalPhotosCount();
+      
+      const firstImageDecision = await requestImageDecision({
+        imageUrls: [basicData.firstPhoto],
+        imageIndex: 0,
+        totalImages: totalPhotosCount,
+        name: basicData.name,
+        skipThreshold: 1,
+        previousResults: []
+      });
+      
+      if (!firstImageDecision) {
+        console.error('❌ First image API request failed. Skipping profile.');
+        await executeSwipe({
+          action: 'skip',
+          reason: 'API request failed for first image analysis',
+          confidence: 1.0
+        });
+        
+        const delay = 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
+      }
+      
+      decisionHistory.push({
+        step: 'first_image',
+        decision: firstImageDecision.action,
+        reason: firstImageDecision.reason,
+        confidence: firstImageDecision.confidence
+      });
+      
+      // If first image says skip/pass, swipe immediately
+      if (firstImageDecision.action === 'skip' || firstImageDecision.action === 'pass' || firstImageDecision.action === 'left') {
+        console.log('⏭️ FIRST IMAGE decision: PASS - swiping left immediately');
+        await executeSwipe(firstImageDecision);
+        
+        const delay = firstImageDecision.nextDelay || 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
+      }
+      
+      console.log('✅ FIRST IMAGE passed - proceeding to bio analysis');
+      
       // Step 3.2: Bio decision (only if first image passed)
-      console.log('📝 Step 2: Analyzing bio...');
+      console.log('📝 Step 2: Making BIO decision...');
       const fullProfileData = await extractFullProfileData(basicData);
       
       const bioDecision = await requestTextDecision(fullProfileData);
@@ -164,7 +175,7 @@ async function executeSwipeLoop() {
       
       // If bio says skip/pass, swipe immediately
       if (bioDecision.action === 'skip' || bioDecision.action === 'pass' || bioDecision.action === 'left') {
-        console.log('⏭️ Bio decision: PASS - swiping left immediately');
+        console.log('⏭️ BIO decision: PASS - swiping left immediately');
         await executeSwipe(bioDecision);
         
         const delay = bioDecision.nextDelay || 4000;
@@ -174,43 +185,58 @@ async function executeSwipeLoop() {
         continue;
       }
       
-      console.log('✅ Bio passed - proceeding to remaining images');
+      console.log('✅ BIO passed - proceeding to remaining images one by one');
       
-      // Step 3.3: Sequential image decisions (starting from 2nd image)
-      const allPhotos = await extractAllPhotos();
-      const remainingPhotos = allPhotos.slice(1); // Skip first photo as we already analyzed it
+      // Step 3.3: Sequential image decisions (get and analyze photos one by one)
+      console.log(`🖼️ Step 3: Analyzing remaining images one by one...`);
+      
+      let currentImageIndex = 1; // Start from second image
       let shouldSwipeRight = true;
       
-      console.log(`🖼️ Step 3: Analyzing ${remainingPhotos.length} remaining images sequentially...`);
-      
-      for (let i = 0; i < remainingPhotos.length; i++) {
-        const imageIndex = i + 1; // +1 because we start from second image
-        const photoUrl = remainingPhotos[i];
+      // Navigate through images one by one and analyze each
+      while (currentImageIndex < totalPhotosCount && shouldSwipeRight) {
+        console.log(`🖼️ Getting image ${currentImageIndex + 1}/${totalPhotosCount}...`);
         
-        console.log(`🖼️ Analyzing image ${imageIndex + 1}/${allPhotos.length}...`);
+        // Navigate to this specific image
+        const photoUrl = await getSpecificPhoto(currentImageIndex);
+        
+        if (!photoUrl) {
+          console.log(`⚠️ Could not get image ${currentImageIndex + 1} - treating as skip`);
+          decisionHistory.push({
+            step: `image_${currentImageIndex + 1}`,
+            decision: 'skip',
+            reason: 'Could not extract image',
+            confidence: 1.0
+          });
+          currentImageIndex++;
+          continue;
+        }
+        
+        console.log(`🖼️ Making decision for image ${currentImageIndex + 1}/${totalPhotosCount}...`);
         
         const imageDecision = await requestImageDecision({
           imageUrls: [photoUrl],
-          imageIndex: imageIndex,
-          totalImages: allPhotos.length,
+          imageIndex: currentImageIndex,
+          totalImages: totalPhotosCount,
           name: fullProfileData.name,
           skipThreshold: 1,
           previousResults: decisionHistory
         });
         
         if (!imageDecision) {
-          console.error(`❌ Image ${imageIndex + 1} API request failed. Treating as skip.`);
+          console.error(`❌ Image ${currentImageIndex + 1} API request failed. Treating as skip.`);
           decisionHistory.push({
-            step: `image_${imageIndex + 1}`,
+            step: `image_${currentImageIndex + 1}`,
             decision: 'skip',
             reason: 'API request failed',
             confidence: 1.0
           });
+          currentImageIndex++;
           continue;
         }
         
         decisionHistory.push({
-          step: `image_${imageIndex + 1}`,
+          step: `image_${currentImageIndex + 1}`,
           decision: imageDecision.action,
           reason: imageDecision.reason,
           confidence: imageDecision.confidence
@@ -218,21 +244,22 @@ async function executeSwipeLoop() {
         
         // If any image says skip/pass, swipe left immediately
         if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
-          console.log(`⏭️ Image ${imageIndex + 1} decision: PASS - swiping left immediately`);
+          console.log(`⏭️ IMAGE ${currentImageIndex + 1} decision: PASS - swiping left immediately`);
           await executeSwipe(imageDecision);
           shouldSwipeRight = false;
           break;
         }
         
-        console.log(`✅ Image ${imageIndex + 1} passed`);
+        console.log(`✅ IMAGE ${currentImageIndex + 1} passed`);
+        currentImageIndex++;
       }
       
       // Step 3.4: If all steps passed, swipe right
       if (shouldSwipeRight) {
-        console.log('💕 All analysis steps passed - swiping right!');
+        console.log('💕 ALL analysis steps passed - swiping right!');
         const finalDecision = {
           action: 'like',
-          reason: 'Passed all analysis steps (first image, bio, and remaining images)',
+          reason: 'Passed all analysis steps (first image, bio, and all remaining images)',
           confidence: 0.9,
           decisionHistory: decisionHistory
         };
@@ -470,18 +497,7 @@ async function extractFirstPhotoOnly() {
       }
     }
     
-    const keenSlides = document.querySelectorAll('.keen-slider__slide');
-    if (keenSlides.length > 0) {
-      const firstSlide = keenSlides[0];
-      const ariaLabel = firstSlide.getAttribute('aria-label');
-      if (ariaLabel) {
-        const match = ariaLabel.match(/\d+ of (\d+)/);
-        if (match) {
-          // Store total photos count for potential future use
-          console.log(`📊 Found ${match[1]} total photos`);
-        }
-      }
-    }
+    // Note: Total photos count is now handled by getTotalPhotosCount()
     
     return photos;
     
@@ -647,6 +663,81 @@ function extractAllProfileInfo() {
 }
 
 // Photo extraction utility functions
+async function getTotalPhotosCount() {
+  try {
+    const keenSlides = document.querySelectorAll('.keen-slider__slide');
+    if (keenSlides.length > 0) {
+      const firstSlide = keenSlides[0];
+      const ariaLabel = firstSlide.getAttribute('aria-label');
+      if (ariaLabel) {
+        const match = ariaLabel.match(/\d+ of (\d+)/);
+        if (match) {
+          const totalCount = parseInt(match[1]);
+          console.log(`📊 Found ${totalCount} total photos`);
+          return totalCount;
+        }
+      }
+    }
+    
+    // Fallback: count visible slides
+    const slideCount = keenSlides.length;
+    console.log(`📊 Fallback: counted ${slideCount} slides`);
+    return slideCount || 1;
+    
+  } catch (error) {
+    console.error('❌ Error getting total photos count:', error);
+    return 1;
+  }
+}
+
+async function getSpecificPhoto(imageIndex) {
+  try {
+    console.log(`🔄 Navigating to photo ${imageIndex + 1}...`);
+    
+    // Navigate to the specific photo
+    const photoContainer = document.querySelector('.keen-slider');
+    if (!photoContainer) {
+      console.log('❌ No keen-slider container found');
+      return null;
+    }
+    
+    // Try clicking the indicator first
+    const indicators = document.querySelectorAll('[role="tab"]');
+    if (indicators[imageIndex]) {
+      console.log(`👆 Clicking indicator ${imageIndex + 1}`);
+      indicators[imageIndex].click();
+    } else {
+      // Fallback: use keyboard navigation
+      console.log('⌨️ Using keyboard navigation');
+      for (let i = 0; i < imageIndex; i++) {
+        photoContainer.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true
+        }));
+        await window.delayExecution(200);
+      }
+    }
+    
+    // Wait for navigation
+    await window.delayExecution(1000);
+    
+    // Extract the current active photo
+    const photoUrl = extractCurrentActivePhoto();
+    if (photoUrl) {
+      console.log(`✅ Successfully got photo ${imageIndex + 1}`);
+      return photoUrl;
+    } else {
+      console.log(`❌ Failed to extract photo ${imageIndex + 1}`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error getting photo ${imageIndex + 1}:`, error);
+    return null;
+  }
+}
+
 async function loadAllPhotosFromCarousel(totalPhotos) {
   const photos = [];
   const processedUrls = new Set();
@@ -808,8 +899,27 @@ async function requestImageDecision(imageData) {
     console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);
     
     const endpoint = window.universalState.config.imageApiEndpoint || window.universalState.config.apiEndpoint;
+    
+    if (!endpoint) {
+      throw new Error('No API endpoint configured');
+    }
+    
+    console.log(`🔗 Using endpoint: ${endpoint}`);
+    console.log(`📦 Request payload:`, {
+      userId: requestPayload.userId,
+      imageCount: requestPayload.imageUrls?.length,
+      imageIndex: requestPayload.imageIndex,
+      totalImages: requestPayload.totalImages,
+      profileName: requestPayload.profileName
+    });
+    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ API request timeout after 45 seconds');
+      controller.abort();
+    }, 45000);
+    
+    console.log(`🚀 Sending POST request to ${endpoint}...`);
     
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -822,9 +932,12 @@ async function requestImageDecision(imageData) {
     });
     
     clearTimeout(timeoutId);
+    console.log(`📡 Received response with status: ${response.status}`);
 
     if (!response.ok) {
-      throw new Error(`Image API responded with ${response.status}`);
+      const errorText = await response.text();
+      console.log(`❌ Error response body:`, errorText);
+      throw new Error(`Image API responded with ${response.status}: ${errorText}`);
     }
 
     const decision = await response.json();
@@ -839,8 +952,17 @@ async function requestImageDecision(imageData) {
 
   } catch (error) {
     console.error('❌ Image API request failed:', error);
-    console.log('🛑 Stopping swiper due to image API unavailability');
+    console.error('❌ Error type:', error.name);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Stack trace:', error.stack);
     
+    if (error.name === 'AbortError') {
+      console.log('⏰ Request was aborted due to timeout');
+    } else if (error.message.includes('fetch')) {
+      console.log('🌐 Network error - check internet connection and API endpoint');
+    }
+    
+    console.log('🛑 Stopping swiper due to image API unavailability');
     stopSwiping();
     
     return null;

@@ -54,9 +54,10 @@ async function executeSwipeLoop() {
         verified: basicData.verified
       });
       
-      // STEP 3: Human-like decision process
+      // STEP 3: Sequential image analysis - analyze first image, then open profile, then analyze remaining images one by one
       let finalDecision = null;
       let shouldContinue = true;
+      const imageDecisionHistory = [];
       
       // Step 3.1: Quick first image check (if available)
       if (basicData.firstPhoto) {
@@ -75,6 +76,12 @@ async function executeSwipeLoop() {
           break;
         }
         
+        imageDecisionHistory.push({
+          imageIndex: 0,
+          decision: firstImageDecision.action,
+          reason: firstImageDecision.reason
+        });
+        
         if (firstImageDecision.action === 'skip' || firstImageDecision.action === 'pass' || firstImageDecision.action === 'left') {
           console.log('⏭️ Quick PASS based on first image');
           finalDecision = firstImageDecision;
@@ -82,56 +89,77 @@ async function executeSwipeLoop() {
         }
       }
       
-      // Step 3.2: If first image passed or no image, analyze text while fetching remaining images
+      // Step 3.2: If first image passed, extract all photos from opened profile
       if (shouldContinue) {
-        const allImagesPromise = extractAllPhotos();
-        
+        // Extract all photos from the opened profile
+        const allPhotos = await extractAllPhotos();
         const fullProfileData = await extractFullProfileData(basicData);
         
-        console.log('📝 Analyzing text content...');
-        const textDecision = await requestTextDecision(fullProfileData);
+        console.log(`🖼️ Found ${allPhotos.length} total images. Starting sequential analysis...`);
         
-        if (!textDecision) {
-          console.error('❌ Text API request failed. Stopping.');
-          stopSwiping();
-          break;
-        }
+        // Step 3.3: Analyze remaining images one by one, sending previous results
+        let skipCount = imageDecisionHistory.filter(h => ['skip', 'pass', 'left'].includes(h.decision)).length;
+        const remainingPhotos = allPhotos.slice(1); // Skip first photo as we already analyzed it
         
-        if (textDecision.action === 'skip' || textDecision.action === 'pass' || textDecision.action === 'left') {
-          console.log('⏭️ PASS based on text analysis');
-          finalDecision = textDecision;
-          shouldContinue = false;
-        }
-        
-        // Step 3.3: If text passed, analyze all images at once
-        if (shouldContinue) {
-          const allPhotos = await allImagesPromise;
-          console.log(`🖼️ Text passed - analyzing all ${allPhotos.length} images at once...`);
+        for (let i = 0; i < remainingPhotos.length; i++) {
+          const imageIndex = i + 1; // +1 because we start from second image
+          const photoUrl = remainingPhotos[i];
           
-          if (allPhotos.length > 0) {
-            const allImagesDecision = await requestImageDecision({
-              imageUrls: allPhotos,
-              totalImages: allPhotos.length,
-              name: fullProfileData.name,
-              skipThreshold: window.universalState.config.skipAfterImages
-            });
-            
-            if (!allImagesDecision) {
-              console.error('❌ All images API request failed. Stopping.');
-              stopSwiping();
-              break;
-            }
-            
-            if (allImagesDecision.action === 'skip' || allImagesDecision.action === 'pass' || allImagesDecision.action === 'left') {
-              console.log('🚫 PASS based on full image analysis');
-              finalDecision = allImagesDecision;
-            } else {
-              console.log('💕 All checks passed - LIKE decision');
-              finalDecision = textDecision;
-            }
+          console.log(`🖼️ Analyzing image ${imageIndex + 1}/${allPhotos.length}...`);
+          
+          const imageDecision = await requestImageDecision({
+            imageUrls: [photoUrl],
+            imageIndex: imageIndex,
+            totalImages: allPhotos.length,
+            name: fullProfileData.name,
+            skipThreshold: 1,
+            previousResults: imageDecisionHistory // Send previous results
+          });
+          
+          if (!imageDecision) {
+            console.error(`❌ Image ${imageIndex + 1} API request failed. Stopping.`);
+            stopSwiping();
+            shouldContinue = false;
+            break;
+          }
+          
+          imageDecisionHistory.push({
+            imageIndex: imageIndex,
+            decision: imageDecision.action,
+            reason: imageDecision.reason
+          });
+          
+          if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
+            skipCount++;
+            console.log(`⏭️ Image ${imageIndex + 1} received SKIP (${skipCount}/${allPhotos.length} total skips)`);
           } else {
-            console.log('💕 Text passed, no images - LIKE decision');
-            finalDecision = textDecision;
+            console.log(`💕 Image ${imageIndex + 1} received LIKE`);
+          }
+        }
+        
+        // Step 3.4: Make final decision based on all image results
+        if (shouldContinue) {
+          const totalImages = allPhotos.length;
+          const totalSkips = imageDecisionHistory.filter(h => ['skip', 'pass', 'left'].includes(h.decision)).length;
+          
+          console.log(`📊 Final tally: ${totalSkips}/${totalImages} images received SKIP`);
+          
+          if (totalSkips === totalImages) {
+            console.log('🚫 ALL images received SKIP - final decision is PASS');
+            finalDecision = {
+              action: 'skip',
+              reason: `All ${totalImages} images received skip decisions`,
+              confidence: 1.0,
+              imageDecisionHistory: imageDecisionHistory
+            };
+          } else {
+            console.log('💕 At least one image received LIKE - final decision is LIKE');
+            finalDecision = {
+              action: 'like',
+              reason: `${totalImages - totalSkips}/${totalImages} images received positive decisions`,
+              confidence: 0.8,
+              imageDecisionHistory: imageDecisionHistory
+            };
           }
         }
       }
@@ -702,7 +730,8 @@ async function requestImageDecision(imageData) {
       profileName: imageData.name,
       skipThreshold: imageData.skipThreshold,
       swipeCount: window.universalState.swipeCount,
-      stats: window.universalState.stats
+      stats: window.universalState.stats,
+      previousResults: imageData.previousResults || [] // Add previous results
     };
     
     console.log(`🌐 Requesting image-based decision from API for ${imageData.imageUrls?.length || 1} images...`);

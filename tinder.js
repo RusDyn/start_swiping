@@ -47,6 +47,38 @@ async function executeSwipeLoop() {
         break;
       }
       
+      // Skip if no bio found
+      if (!basicData.bio || basicData.bio.trim() === '') {
+        console.log('⏭️ No bio found - skipping profile');
+        await executeSwipe({
+          action: 'skip',
+          reason: 'No bio provided',
+          confidence: 1.0
+        });
+        
+        const delay = 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
+      }
+      
+      // Skip if no first photo found
+      if (!basicData.firstPhoto) {
+        console.log('⏭️ No first photo found - skipping profile');
+        await executeSwipe({
+          action: 'skip',
+          reason: 'No photos available',
+          confidence: 1.0
+        });
+        
+        const delay = 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
+      }
+      
       console.log('\n📋 BASIC DATA EXTRACTED:', {
         name: basicData.name,
         age: basicData.age,
@@ -62,18 +94,33 @@ async function executeSwipeLoop() {
       // Step 3.1: Quick first image check (if available)
       if (basicData.firstPhoto) {
         console.log('🖼️ Analyzing first image for quick decision...');
+        
+        // First, get total photos count to send accurate totalImages
+        const allPhotos = await extractAllPhotos();
+        const totalPhotosCount = allPhotos.length || 1;
+        
         const firstImageDecision = await requestImageDecision({
           imageUrls: [basicData.firstPhoto],
           imageIndex: 0,
-          totalImages: 1,
+          totalImages: totalPhotosCount,
           name: basicData.name,
-          skipThreshold: 1
+          skipThreshold: 1,
+          previousResults: [] // Empty array for first image
         });
         
         if (!firstImageDecision) {
-          console.error('❌ First image API request failed. Stopping.');
-          stopSwiping();
-          break;
+          console.error('❌ First image API request failed. Skipping profile.');
+          await executeSwipe({
+            action: 'skip',
+            reason: 'API request failed for image analysis',
+            confidence: 1.0
+          });
+          
+          const delay = 4000;
+          console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+          await window.delayExecution(delay);
+          window.incrementSwipeCount();
+          continue;
         }
         
         imageDecisionHistory.push({
@@ -89,10 +136,8 @@ async function executeSwipeLoop() {
         }
       }
       
-      // Step 3.2: If first image passed, extract all photos from opened profile
+      // Step 3.2: If first image passed, extract full profile data and analyze remaining photos
       if (shouldContinue) {
-        // Extract all photos from the opened profile
-        const allPhotos = await extractAllPhotos();
         const fullProfileData = await extractFullProfileData(basicData);
         
         console.log(`🖼️ Found ${allPhotos.length} total images. Starting sequential analysis...`);
@@ -117,10 +162,14 @@ async function executeSwipeLoop() {
           });
           
           if (!imageDecision) {
-            console.error(`❌ Image ${imageIndex + 1} API request failed. Stopping.`);
-            stopSwiping();
-            shouldContinue = false;
-            break;
+            console.error(`❌ Image ${imageIndex + 1} API request failed. Treating as skip.`);
+            imageDecisionHistory.push({
+              imageIndex: imageIndex,
+              decision: 'skip',
+              reason: 'API request failed'
+            });
+            skipCount++;
+            continue;
           }
           
           imageDecisionHistory.push({
@@ -233,13 +282,15 @@ async function extractBasicProfileData() {
     name: 'Unknown',
     age: null,
     verified: false,
-    firstPhoto: null
+    firstPhoto: null,
+    bio: ''
   };
   
   try {
     data.name = extractName();
     data.age = extractAge();
     data.verified = extractVerificationStatus();
+    data.bio = extractBio();
     
     const firstPhotos = await extractFirstPhotoOnly();
     if (firstPhotos.length > 0) {
@@ -407,7 +458,8 @@ async function extractFirstPhotoOnly() {
       if (ariaLabel) {
         const match = ariaLabel.match(/\d+ of (\d+)/);
         if (match) {
-          tinderState.totalPhotos = parseInt(match[1]);
+          // Store total photos count for potential future use
+          console.log(`📊 Found ${match[1]} total photos`);
         }
       }
     }

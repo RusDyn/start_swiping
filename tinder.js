@@ -86,16 +86,14 @@ async function executeSwipeLoop() {
         verified: basicData.verified
       });
       
-      // STEP 3: Sequential image analysis - analyze first image, then open profile, then analyze remaining images one by one
-      let finalDecision = null;
-      let shouldContinue = true;
-      const imageDecisionHistory = [];
+      // STEP 3: Sequential decision-making - each step can result in immediate swipe
+      const decisionHistory = [];
       
-      // Step 3.1: Quick first image check (if available)
+      // Step 3.1: First image decision
       if (basicData.firstPhoto) {
-        console.log('🖼️ Analyzing first image for quick decision...');
+        console.log('🖼️ Step 1: Analyzing first image...');
         
-        // First, get total photos count to send accurate totalImages
+        // Get total photos count for context
         const allPhotos = await extractAllPhotos();
         const totalPhotosCount = allPhotos.length || 1;
         
@@ -105,14 +103,14 @@ async function executeSwipeLoop() {
           totalImages: totalPhotosCount,
           name: basicData.name,
           skipThreshold: 1,
-          previousResults: [] // Empty array for first image
+          previousResults: []
         });
         
         if (!firstImageDecision) {
           console.error('❌ First image API request failed. Skipping profile.');
           await executeSwipe({
             action: 'skip',
-            reason: 'API request failed for image analysis',
+            reason: 'API request failed for first image analysis',
             confidence: 1.0
           });
           
@@ -123,111 +121,132 @@ async function executeSwipeLoop() {
           continue;
         }
         
-        imageDecisionHistory.push({
-          imageIndex: 0,
+        decisionHistory.push({
+          step: 'first_image',
           decision: firstImageDecision.action,
-          reason: firstImageDecision.reason
+          reason: firstImageDecision.reason,
+          confidence: firstImageDecision.confidence
         });
         
+        // If first image says skip/pass, swipe immediately
         if (firstImageDecision.action === 'skip' || firstImageDecision.action === 'pass' || firstImageDecision.action === 'left') {
-          console.log('⏭️ Quick PASS based on first image');
-          finalDecision = firstImageDecision;
-          shouldContinue = false;
+          console.log('⏭️ First image decision: PASS - swiping left immediately');
+          await executeSwipe(firstImageDecision);
+          
+          const delay = firstImageDecision.nextDelay || 4000;
+          console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+          await window.delayExecution(delay);
+          window.incrementSwipeCount();
+          continue;
         }
+        
+        console.log('✅ First image passed - proceeding to bio analysis');
       }
       
-      // Step 3.2: If first image passed, extract full profile data and analyze remaining photos
-      if (shouldContinue) {
-        const fullProfileData = await extractFullProfileData(basicData);
-        
-        console.log(`🖼️ Found ${allPhotos.length} total images. Starting sequential analysis...`);
-        
-        // Step 3.3: Analyze remaining images one by one, sending previous results
-        let skipCount = imageDecisionHistory.filter(h => ['skip', 'pass', 'left'].includes(h.decision)).length;
-        const remainingPhotos = allPhotos.slice(1); // Skip first photo as we already analyzed it
-        
-        for (let i = 0; i < remainingPhotos.length; i++) {
-          const imageIndex = i + 1; // +1 because we start from second image
-          const photoUrl = remainingPhotos[i];
-          
-          console.log(`🖼️ Analyzing image ${imageIndex + 1}/${allPhotos.length}...`);
-          
-          const imageDecision = await requestImageDecision({
-            imageUrls: [photoUrl],
-            imageIndex: imageIndex,
-            totalImages: allPhotos.length,
-            name: fullProfileData.name,
-            skipThreshold: 1,
-            previousResults: imageDecisionHistory // Send previous results
-          });
-          
-          if (!imageDecision) {
-            console.error(`❌ Image ${imageIndex + 1} API request failed. Treating as skip.`);
-            imageDecisionHistory.push({
-              imageIndex: imageIndex,
-              decision: 'skip',
-              reason: 'API request failed'
-            });
-            skipCount++;
-            continue;
-          }
-          
-          imageDecisionHistory.push({
-            imageIndex: imageIndex,
-            decision: imageDecision.action,
-            reason: imageDecision.reason
-          });
-          
-          if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
-            skipCount++;
-            console.log(`⏭️ Image ${imageIndex + 1} received SKIP (${skipCount}/${allPhotos.length} total skips)`);
-          } else {
-            console.log(`💕 Image ${imageIndex + 1} received LIKE`);
-          }
-        }
-        
-        // Step 3.4: Make final decision based on all image results
-        if (shouldContinue) {
-          const totalImages = allPhotos.length;
-          const totalSkips = imageDecisionHistory.filter(h => ['skip', 'pass', 'left'].includes(h.decision)).length;
-          
-          console.log(`📊 Final tally: ${totalSkips}/${totalImages} images received SKIP`);
-          
-          if (totalSkips === totalImages) {
-            console.log('🚫 ALL images received SKIP - final decision is PASS');
-            finalDecision = {
-              action: 'skip',
-              reason: `All ${totalImages} images received skip decisions`,
-              confidence: 1.0,
-              imageDecisionHistory: imageDecisionHistory
-            };
-          } else {
-            console.log('💕 At least one image received LIKE - final decision is LIKE');
-            finalDecision = {
-              action: 'like',
-              reason: `${totalImages - totalSkips}/${totalImages} images received positive decisions`,
-              confidence: 0.8,
-              imageDecisionHistory: imageDecisionHistory
-            };
-          }
-        }
-      }
+      // Step 3.2: Bio decision (only if first image passed)
+      console.log('📝 Step 2: Analyzing bio...');
+      const fullProfileData = await extractFullProfileData(basicData);
       
-      // STEP 4: Execute final swipe decision
-      if (finalDecision) {
-        await executeSwipe(finalDecision);
-      } else {
-        console.error('❌ No final decision made. Stopping.');
+      const bioDecision = await requestTextDecision(fullProfileData);
+      
+      if (!bioDecision || bioDecision.action === 'stop') {
+        console.error('❌ Bio API request failed or requested stop.');
         stopSwiping();
         break;
       }
       
-      // Wait before next profile
-      const delay = finalDecision?.nextDelay || 4000;
-      console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
-      await window.delayExecution(delay);
+      decisionHistory.push({
+        step: 'bio',
+        decision: bioDecision.action,
+        reason: bioDecision.reason,
+        confidence: bioDecision.confidence
+      });
       
-      window.incrementSwipeCount();
+      // If bio says skip/pass, swipe immediately
+      if (bioDecision.action === 'skip' || bioDecision.action === 'pass' || bioDecision.action === 'left') {
+        console.log('⏭️ Bio decision: PASS - swiping left immediately');
+        await executeSwipe(bioDecision);
+        
+        const delay = bioDecision.nextDelay || 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+        continue;
+      }
+      
+      console.log('✅ Bio passed - proceeding to remaining images');
+      
+      // Step 3.3: Sequential image decisions (starting from 2nd image)
+      const allPhotos = await extractAllPhotos();
+      const remainingPhotos = allPhotos.slice(1); // Skip first photo as we already analyzed it
+      let shouldSwipeRight = true;
+      
+      console.log(`🖼️ Step 3: Analyzing ${remainingPhotos.length} remaining images sequentially...`);
+      
+      for (let i = 0; i < remainingPhotos.length; i++) {
+        const imageIndex = i + 1; // +1 because we start from second image
+        const photoUrl = remainingPhotos[i];
+        
+        console.log(`🖼️ Analyzing image ${imageIndex + 1}/${allPhotos.length}...`);
+        
+        const imageDecision = await requestImageDecision({
+          imageUrls: [photoUrl],
+          imageIndex: imageIndex,
+          totalImages: allPhotos.length,
+          name: fullProfileData.name,
+          skipThreshold: 1,
+          previousResults: decisionHistory
+        });
+        
+        if (!imageDecision) {
+          console.error(`❌ Image ${imageIndex + 1} API request failed. Treating as skip.`);
+          decisionHistory.push({
+            step: `image_${imageIndex + 1}`,
+            decision: 'skip',
+            reason: 'API request failed',
+            confidence: 1.0
+          });
+          continue;
+        }
+        
+        decisionHistory.push({
+          step: `image_${imageIndex + 1}`,
+          decision: imageDecision.action,
+          reason: imageDecision.reason,
+          confidence: imageDecision.confidence
+        });
+        
+        // If any image says skip/pass, swipe left immediately
+        if (imageDecision.action === 'skip' || imageDecision.action === 'pass' || imageDecision.action === 'left') {
+          console.log(`⏭️ Image ${imageIndex + 1} decision: PASS - swiping left immediately`);
+          await executeSwipe(imageDecision);
+          shouldSwipeRight = false;
+          break;
+        }
+        
+        console.log(`✅ Image ${imageIndex + 1} passed`);
+      }
+      
+      // Step 3.4: If all steps passed, swipe right
+      if (shouldSwipeRight) {
+        console.log('💕 All analysis steps passed - swiping right!');
+        const finalDecision = {
+          action: 'like',
+          reason: 'Passed all analysis steps (first image, bio, and remaining images)',
+          confidence: 0.9,
+          decisionHistory: decisionHistory
+        };
+        await executeSwipe(finalDecision);
+      }
+      
+      // Wait before next profile (only if we haven't already waited)
+      if (shouldSwipeRight) {
+        const delay = 4000;
+        console.log(`\n⏱️ Waiting ${delay}ms before next profile...`);
+        await window.delayExecution(delay);
+        window.incrementSwipeCount();
+      }
+      
       console.log(`✅ Swipe #${window.universalState.swipeCount} completed!\n`);
 
     } catch (error) {

@@ -859,6 +859,11 @@ async function requestTextDecision(profileData) {
 
     const decision = await response.json();
     
+    // Clean up the reason if it's empty or just "Reason:"
+    if (!decision.reason || decision.reason.trim() === '' || decision.reason.trim() === 'Reason:') {
+      decision.reason = `API decision: ${decision.action}`;
+    }
+    
     console.log('📝 Text decision received:', {
       action: decision.action,
       reason: decision.reason,
@@ -941,6 +946,11 @@ async function requestImageDecision(imageData) {
     }
 
     const decision = await response.json();
+    
+    // Clean up the reason if it's empty or just "Reason:"
+    if (!decision.reason || decision.reason.trim() === '' || decision.reason.trim() === 'Reason:') {
+      decision.reason = `API decision: ${decision.action}`;
+    }
     
     console.log('📝 Image decision received:', {
       action: decision.action,
